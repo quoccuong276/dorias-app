@@ -695,7 +695,7 @@ function gisReady() { return window.google && google.accounts && google.accounts
 function initAuthClient() {
   if (auth.client || !gisReady()) return !!auth.client;
   auth.client = google.accounts.oauth2.initTokenClient({
-    client_id: CFG.CLIENT_ID, scope: "https://www.googleapis.com/auth/spreadsheets",
+    client_id: CFG.CLIENT_ID, scope: "https://www.googleapis.com/auth/spreadsheets.readonly",
     callback: function (r) {
       $("loginBtn").disabled = false;
       if (!r || r.error || !r.access_token) { $("loginMsg").textContent = "Chưa đăng nhập được. Bấm lại và chọn đúng tài khoản được chia sẻ sheet."; return; }

@@ -1788,6 +1788,108 @@ function tdAlertHtml(al) {
   }).join("") + '</section>';
 }
 
+/* ---- Chia sẻ báo cáo chi tiêu ngày dưới dạng ảnh (vẽ bằng canvas, không gửi dữ liệu ra ngoài) ---- */
+var shOff = 0, shBlob = null, shName = "";
+function shRR(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+function shFit(c, text, maxW) { text = String(text); if (c.measureText(text).width <= maxW) return text; while (text.length > 1 && c.measureText(text + "…").width > maxW) text = text.slice(0, -1); return text + "…"; }
+function shDraw(d, k) {
+  var T = tdDay(d, k), sv = {}, order = [];
+  d.spend.forEach(function (x) {
+    if (x.n !== k) return;
+    var q = sv[x.key] || (sv[x.key] = { name: x.name || x.key, spend: 0, mess: 0, data: 0 });
+    if (order.indexOf(x.key) < 0) order.push(x.key);
+    q.spend += x.spend; q.mess += x.mess; q.data += x.data;
+  });
+  var rows = order.map(function (key) { return sv[key]; }).filter(function (q) { return q.spend > 0 || q.mess > 0 || q.data > 0; }).sort(function (a, b) { return b.spend - a.spend; });
+  var W = 1080, P = 56, rowH = 72, mkN = T.mk[""] > 0 ? 3 : 2;
+  var H = 64 + 120 + 250 + 150 + 70 + Math.max(rows.length, 1) * rowH + 40 + 70 + mkN * 52 + 50;
+  var cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+  var c = cv.getContext("2d"), ff = getComputedStyle(document.body).fontFamily || "sans-serif";
+  var navy = "#1F4E79";
+  var ink = "#1b2a3a", muted = "#6b7a8c", line = "#e3e8ee";
+  function T_(txt, x, y, size, weight, color, align) { c.font = weight + " " + size + "px " + ff; c.fillStyle = color; c.textAlign = align || "left"; c.fillText(txt, x, y); }
+  c.fillStyle = "#ffffff"; c.fillRect(0, 0, W, H);
+  c.fillStyle = navy; c.fillRect(0, 0, W, 8);
+  var wd = ["Chủ nhật", "Thứ hai", "Thứ ba", "Thứ tư", "Thứ năm", "Thứ sáu", "Thứ bảy"][new Date(k * 86400000).getUTCDay()];
+  T_("DORIAS", P, 84, 44, 700, navy);
+  T_("Báo cáo chi tiêu", P, 130, 28, 500, muted);
+  T_(wd + " " + dnDmy(k), W - P, 84, 34, 700, ink, "right");
+  var live = k === todayNum();
+  T_(live ? "Tính đến " + hhmm(d.ts) : "Cả ngày", W - P, 130, 26, 500, muted, "right");
+  var y = 168;
+  shRR(c, P, y, W - 2 * P, 210, 28); c.fillStyle = navy; c.fill();
+  T_("TỔNG CHI TIÊU", P + 36, y + 56, 24, 600, "rgba(255,255,255,.72)");
+  T_(vnd(T.spend), P + 36, y + 146, 82, 700, "#ffffff");
+  y += 210 + 28;
+  var bx = [["Mess", n(Math.round(T.mess))], ["Data", n(Math.round(T.data))], ["CP / data", T.data > 0 ? mon(T.spend / T.data) : "-"], ["CP / mess", T.mess > 0 ? mon(T.spend / T.mess) : "-"]];
+  var bw = (W - 2 * P - 3 * 16) / 4;
+  bx.forEach(function (b, i) {
+    var x = P + i * (bw + 16);
+    shRR(c, x, y, bw, 118, 20); c.fillStyle = "#f2f5f9"; c.fill();
+    T_(b[0], x + 20, y + 40, 22, 600, muted);
+    T_(b[1], x + 20, y + 90, 40, 700, ink);
+  });
+  y += 118 + 44;
+  T_("THEO DỊCH VỤ", P, y, 24, 700, muted);
+  y += 28;
+  var cx = { sp: 560, ms: 700, dt: 820, cp: W - P };
+  T_("Chi tiêu", cx.sp, y + 34, 22, 600, muted, "right"); T_("Mess", cx.ms, y + 34, 22, 600, muted, "right"); T_("Data", cx.dt, y + 34, 22, 600, muted, "right"); T_("CP/data", cx.cp, y + 34, 22, 600, muted, "right");
+  y += 52; c.fillStyle = line; c.fillRect(P, y, W - 2 * P, 2);
+  if (!rows.length) { T_("Chưa có dịch vụ nào ghi chi tiêu.", P, y + 48, 26, 500, muted); y += rowH; }
+  rows.forEach(function (q) {
+    y += rowH;
+    c.font = "600 28px " + ff;
+    T_(shFit(c, sentence(q.name), 300), P, y - 24, 28, 600, ink);
+    T_(vnd(q.spend), cx.sp, y - 24, 28, 600, ink, "right");
+    T_(n(Math.round(q.mess)), cx.ms, y - 24, 28, 500, ink, "right");
+    T_(n(Math.round(q.data)), cx.dt, y - 24, 28, 500, ink, "right");
+    T_(q.data > 0 ? mon(q.spend / q.data) : "-", cx.cp, y - 24, 28, 500, ink, "right");
+    c.fillStyle = line; c.fillRect(P, y, W - 2 * P, 1);
+  });
+  y += 52;
+  T_("THEO THỊ TRƯỜNG (chi tiêu)", P, y, 24, 700, muted);
+  var mkRows = [["Việt kiều", T.mk.vk], ["Việt Nam", T.mk.vn]].concat(T.mk[""] > 0 ? [["Chưa ghi thị trường", T.mk[""]]] : []);
+  mkRows.forEach(function (m) { y += 52; T_(m[0], P, y, 28, 500, ink); T_(vnd(m[1]), W - P, y, 28, 600, ink, "right"); });
+  y += 70;
+  T_("Nguồn: Google Sheets DORIAS · Nội bộ", P, y, 22, 500, muted);
+  return { canvas: cv, name: "bao-cao-chi-tieu-" + dnDmy(k).replace(/\//g, "-") + ".png", dmy: dnDmy(k) };
+}
+function fillShare() {
+  var box = $("tdShare");
+  if (!todayData || !box) return;
+  var t = todayNum(), k = t - shOff, r = shDraw(todayData, k), canShare = typeof navigator.canShare === "function" && typeof navigator.share === "function";
+  var chips = [["Hôm nay", 0], ["Hôm qua", 1], ["2 ngày trước", 2]].map(function (c) {
+    return '<button type="button" class="chip" data-shd="' + c[1] + '" aria-pressed="' + (shOff === c[1] ? "true" : "false") + '">' + c[0] + ' ' + dnDmy(t - c[1]).slice(0, 5) + '</button>';
+  }).join("");
+  box.innerHTML = '<section class="card"><div class="eyebrow">Gửi báo cáo chi tiêu</div><div class="presets">' + chips + '</div>' +
+    '<img id="shImg" alt="Ảnh báo cáo chi tiêu ngày ' + r.dmy + '" style="width:100%;height:auto;border:1px solid var(--line);border-radius:12px;margin:4px 0 12px;display:block">' +
+    '<div class="presets">' + (canShare ? '<button type="button" class="chip" data-sha="share">Chia sẻ (Zalo, tin nhắn…)</button>' : '') +
+    '<button type="button" class="chip" data-sha="copy">Sao chép ảnh</button><button type="button" class="chip" data-sha="save">Tải ảnh</button></div>' +
+    '<div class="small" id="shMsg" role="status"></div>' +
+    '<div class="small">Ảnh được tạo ngay trên máy bạn từ số liệu đang hiển thị. Hôm nay chưa hết ngày nên số sẽ tăng thêm.</div></section>';
+  $("shImg").src = r.canvas.toDataURL("image/png");
+  shBlob = null; shName = r.name;
+  r.canvas.toBlob(function (b) { shBlob = b; }, "image/png");
+}
+function shAct(kind) {
+  var msg = $("shMsg");
+  function say(t) { if (msg) msg.textContent = t; }
+  if (!shBlob) { say("Ảnh chưa sẵn sàng, thử lại sau một giây."); return; }
+  if (kind === "share") {
+    var f = new File([shBlob], shName, { type: "image/png" });
+    if (!navigator.canShare || !navigator.canShare({ files: [f] })) { say("Thiết bị này chưa hỗ trợ chia sẻ ảnh trực tiếp. Dùng Sao chép ảnh hoặc Tải ảnh."); return; }
+    navigator.share({ files: [f], title: "Báo cáo chi tiêu " + dnDmy(todayNum() - shOff) }).then(function () { say("Đã mở chia sẻ."); }).catch(function (e) { if (!e || e.name !== "AbortError") say("Không mở được chia sẻ. Thử Tải ảnh."); });
+  } else if (kind === "copy") {
+    if (!navigator.clipboard || typeof ClipboardItem === "undefined") { say("Trình duyệt này không cho sao chép ảnh. Dùng Tải ảnh."); return; }
+    navigator.clipboard.write([new ClipboardItem({ "image/png": shBlob })]).then(function () { say("Đã sao chép ảnh. Mở nhóm Zalo và dán (Ctrl+V)."); }).catch(function () { say("Không sao chép được. Dùng Tải ảnh."); });
+  } else {
+    var u = URL.createObjectURL(shBlob), a = document.createElement("a");
+    a.href = u; a.download = shName; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+    say("Đã tải ảnh về máy.");
+  }
+}
+
 var cbF = { tele: "all", st: "all", limit: 20 };
 function cbLeads(d, t) {
   var done = {};
@@ -1869,6 +1971,7 @@ function renderToday() {
   out.push('<section class="card"><div class="eyebrow">Theo dịch vụ hôm nay</div>' + (cards || '<div class="small">Hôm nay chưa có dịch vụ nào ghi chi tiêu.</div>') +
     '<div class="rows" style="margin-top:8px">' + kv("Việt kiều (chi tiêu)", vnd(T0.mk.vk)) + kv("Việt Nam (chi tiêu)", vnd(T0.mk.vn)) + (T0.mk[""] > 0 ? kv("Chưa ghi thị trường", vnd(T0.mk[""])) : "") + '</div></section>');
 
+  out.push('<div id="tdShare"></div>');
   out.push('<div id="tdCb"></div>');
   out.push('<div id="tdData"></div>');
 
@@ -1877,6 +1980,7 @@ function renderToday() {
     return '<div class="row"><span class="k">' + esc(x.name || "Chưa có tên") + '<br><span class="small">' + esc(x.key === "CHUA RO" ? "Chưa rõ dịch vụ" : sentence(d.names[x.key] || x.key)) + '</span></span><span class="v">' + vnd(x.amt) + '</span></div>';
   }).join("") + '</div>' : '<div class="small">Hôm nay chưa có hóa đơn nào.</div>') + '</section>');
   $("appToday").innerHTML = out.join("");
+  fillShare();
   fillCallback();
   fillTodayData();
 }
@@ -1904,6 +2008,8 @@ function initToday() {
     else if (b.hasAttribute("data-cbt")) { cbF.tele = b.getAttribute("data-cbt"); cbF.limit = 20; fillCallback(); }
     else if (b.hasAttribute("data-cbs")) { cbF.st = b.getAttribute("data-cbs"); cbF.limit = 20; fillCallback(); }
     else if (b.hasAttribute("data-cbmore")) { cbF.limit += 20; fillCallback(); }
+    else if (b.hasAttribute("data-shd")) { shOff = +b.getAttribute("data-shd"); fillShare(); }
+    else if (b.hasAttribute("data-sha")) { shAct(b.getAttribute("data-sha")); }
   });
 }
 

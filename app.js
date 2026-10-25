@@ -1396,8 +1396,9 @@ function svcCalc(d, key, a, b) {
   var leads = d.leads.filter(function (l) { return l.n >= a && l.n <= b && (key === "all" || l.key === key); });
   var valid = leads.filter(function (l) { return l.st === "pot" || l.st === "book" || l.st === "inv"; }).length;
   var leadInv = leads.filter(function (l) { return l.st === "inv"; }).length;
+  var leadBook = leads.filter(function (l) { return l.st === "book" || l.st === "inv"; }).length;
   return {
-    sp: sp, inv: inv, rev: rev, cnt: inv.length, custs: Object.keys(custs).length, byMk: byMk, leads: leads.length, valid: valid, leadInv: leadInv,
+    sp: sp, inv: inv, rev: rev, cnt: inv.length, custs: Object.keys(custs).length, byMk: byMk, leads: leads.length, valid: valid, leadInv: leadInv, leadBook: leadBook,
     roas: sp.spend > 0 ? rev / sp.spend : null, adsPct: rev > 0 ? sp.spend / rev : null, profit: rev - sp.spend,
     cpa: inv.length ? sp.spend / inv.length : null, aov: inv.length ? rev / inv.length : null,
     cpd: sp.data > 0 ? sp.spend / sp.data : null, cpm: sp.mess > 0 ? sp.spend / sp.mess : null, dm: sp.mess > 0 ? sp.data / sp.mess : null
@@ -1499,6 +1500,38 @@ function svcFillList(onlyList) {
     ? shown.map(svcCustCard).join("") + (list.length > shown.length ? '<button type="button" class="apply" data-smore="1">Xem thêm ' + Math.min(30, list.length - shown.length) + ' hóa đơn (còn ' + n(list.length - shown.length) + ')</button>' : '<div class="small">Đã hiện hết ' + n(list.length) + ' hóa đơn.</div>')
     : '<div class="small">Không có hóa đơn nào khớp bộ lọc.</div>';
 }
+
+function svcFunnelHtml(c) {
+  var st = [["Mess", c.sp.mess], ["Data theo quảng cáo", c.sp.data], ["Lead nhập DATA_SALE", c.leads], ["Lead hợp lệ", c.valid], ["Đặt hẹn hoặc hóa đơn (lead)", c.leadBook], ["Hóa đơn", c.cnt]];
+  var max = Math.max.apply(null, st.map(function (x) { return x[1]; })) || 1, prev = null;
+  return '<div class="funnel">' + st.map(function (x, i) {
+    var v = Math.round(x[1]), rate = prev != null && prev > 0 ? " · " + pct(v / prev) : "";
+    prev = v;
+    return '<div class="stage"><div class="top"><span class="name">' + x[0] + '</span><span class="num sm">' + n(v) + '<span class="small">' + (i ? rate : "") + '</span></span></div><div class="track"><i style="width:' + Math.max(v / max * 100, 1).toFixed(1) + '%"></i></div></div>';
+  }).join("") + '</div><div class="small">Phần trăm cạnh mỗi bước là so với bước ngay phía trên. Mess, data lấy từ chi phí quảng cáo. Lead, hẹn lấy từ DATA_SALE. Hóa đơn lấy từ tab HÓA ĐƠN, nên các bước không khớp từng người một.</div>';
+}
+function svcWeeklyHtml(d, key, a, b) {
+  if (b - a + 1 < 14) return "";
+  var rows = [], k, w = 0;
+  for (k = a; k <= b && w < 14; k += 7, w++) {
+    var e = Math.min(k + 6, b), c = svcCalc(d, key, k, e);
+    rows.push({ lab: dnDmy(k).slice(0, 5) + "–" + dnDmy(e).slice(0, 5), c: c });
+  }
+  var more = k <= b ? '<div class="small">Chỉ hiện 14 tuần đầu của kỳ.</div>' : "";
+  return '<div class="cmp" style="grid-template-columns:minmax(0,1.25fr) minmax(0,1fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,.8fr)"><span></span><b>Chi tiêu</b><b>Data</b><b>CP/data</b><b>Hợp lệ</b>' +
+    rows.map(function (r) {
+      return '<span class="k">' + r.lab + '</span><span class="v">' + mon(r.c.sp.spend) + '</span><span class="v">' + n(Math.round(r.c.sp.data)) + '</span><span class="v">' + dash(r.c.cpd, mon) + '</span><span class="v">' + dash(r.c.leads ? r.c.valid / r.c.leads : null, pct) + '</span>';
+    }).join("") + '</div>' + more + '<div class="small">Mỗi dòng là 7 ngày. CP/data tăng dần qua các tuần nghĩa là dịch vụ đang kém đi.</div>';
+}
+function svcCompareHtml(d, keys, a, b) {
+  var rows = keys.map(function (k) { return { k: k, c: svcCalc(d, k, a, b) }; }).filter(function (r) { return r.c.sp.spend > 0 || r.c.cnt > 0 || r.c.leads > 0; })
+    .sort(function (x, y) { return y.c.sp.spend - x.c.sp.spend; });
+  if (!rows.length) return "";
+  return '<div class="cmp" style="grid-template-columns:minmax(0,1.2fr) minmax(0,1fr) minmax(0,1fr) minmax(0,.8fr) minmax(0,.9fr)"><span></span><b>Chi tiêu</b><b>CP/data</b><b>Hợp lệ</b><b>Hóa đơn</b>' +
+    rows.map(function (r) {
+      return '<span class="k">' + esc(sentence(svcName(d, r.k))) + '</span><span class="v">' + mon(r.c.sp.spend) + '</span><span class="v">' + dash(r.c.cpd, mon) + '</span><span class="v">' + dash(r.c.leads ? r.c.valid / r.c.leads : null, pct) + '</span><span class="v">' + n(r.c.cnt) + '</span>';
+    }).join("") + '</div><div class="small">Chọn từng dịch vụ ở ô phía trên để xem phễu và xu hướng chi tiết.</div>';
+}
 function renderSvc() {
   var d = svcData;
   if (!d || !curSvc) return;
@@ -1525,6 +1558,11 @@ function renderSvc() {
     kv("Mess", n(Math.round(c.sp.mess))) + kv("Data", n(Math.round(c.sp.data))) + kv("Data / mess", dash(c.dm, pct)) +
     kv("CP / mess", dash(c.cpm, vnd)) + kv("CP / data", dash(c.cpd, vnd)) +
     kv("Lead ghi nhận (DATA_SALE)", n(c.leads)) + kv("Lead hợp lệ", n(c.valid) + (c.leads ? " · " + pct(c.valid / c.leads) : "")) + '</div></section>');
+
+  out.push('<section class="card"><div class="eyebrow">Phễu từ mess đến hóa đơn</div>' + svcFunnelHtml(c) + '</section>');
+  if (key === "all") { var cmpH = svcCompareHtml(d, keys, a, b); if (cmpH) out.push('<section class="card"><div class="eyebrow">So sánh các dịch vụ</div>' + cmpH + '</section>'); }
+  var wk = svcWeeklyHtml(d, key, a, b);
+  if (wk) out.push('<section class="card"><div class="eyebrow">Xu hướng theo tuần</div>' + wk + '</section>');
 
   var ch = svcSeriesHtml(d, key, a, b);
   if (ch) out.push('<section class="card"><div class="eyebrow">Chi tiêu và doanh thu theo thời gian</div>' + ch + '</section>');
@@ -1647,7 +1685,7 @@ function tdDay(d, k) {
   return { spend: o.spend, mess: o.mess, data: o.data, rev: rev, cnt: cnt, mk: o.mk };
 }
 function tdLeadGroup(st) { return st === "pot" || st === "book" || st === "inv" || st === "untouched" || st === "consult" ? st : "etc"; }
-function tdLeadCard(l) {
+function tdLeadCard(l, age) {
   var s = LST[l.st] || ["", ""], label = l.st === "other" ? (l.stText || "Khác") : s[0];
   var tel = l.phone.replace(/[^\d+]/g, ""), isNum = /^\+?\d{7,}$/.test(tel);
   var m1 = ["Tele " + esc(l.tele || "chưa rõ")];
@@ -1660,6 +1698,7 @@ function tdLeadCard(l) {
   if (l.apptTxt) notes.push("Hẹn: " + esc(l.apptTxt) + (l.apptTime ? " " + esc(l.apptTime) : ""));
   if (l.note) notes.push(esc(l.note));
   return '<div class="appt"><div class="svc-h"><b>' + esc(l.name || "Chưa có tên") + '</b><span class="pill ' + s[1] + '">' + esc(label || "Chưa có tình trạng") + '</span></div>' +
+    (age ? '<div class="appt-m"><b>' + esc(age) + '</b></div>' : '') +
     '<div class="appt-m">' + m1.join(" · ") + '</div>' +
     (m2.length || l.phone ? '<div class="appt-m">' + m2.join(" · ") + (l.phone ? (m2.length ? " · " : "") + (isNum ? '<a href="tel:' + tel + '">' + esc(l.phone) + '</a>' : esc(l.phone)) : "") + '</div>' : '') +
     (notes.length ? '<div class="appt-n">' + notes.join(" · ") + '</div>' : '') + '</div>';
@@ -1748,6 +1787,40 @@ function tdAlertHtml(al) {
     return '<p class="verdict"><span class="pill ' + a.lvl + '">' + (a.lvl === "bad" ? "Gấp" : "Theo dõi") + '</span> <b>' + esc(a.title) + '</b><br>' + esc(a.text) + '</p>';
   }).join("") + '</section>';
 }
+
+var cbF = { tele: "all", st: "all", limit: 20 };
+function cbLeads(d, t) {
+  var done = {};
+  d.leads.forEach(function (l) { if (l.pk && (l.st === "book" || l.st === "inv")) done[l.pk] = 1; });
+  d.inv.forEach(function (x) { if (x.pk) done[x.pk] = 1; });
+  var seen = {};
+  return d.leads.filter(function (l) {
+    if (l.n >= t || l.n < t - 14 || (l.st !== "untouched" && l.st !== "pot")) return false;
+    if (l.pk) { if (done[l.pk] || seen[l.pk]) return false; seen[l.pk] = 1; }
+    return true;
+  }).sort(function (a, b) { return (a.st === "untouched" ? 0 : 1) - (b.st === "untouched" ? 0 : 1) || a.n - b.n || a.row - b.row; });
+}
+function cbAge(t, k) { var x = t - k; return x === 1 ? "Về hôm qua" : "Về " + x + " ngày trước (" + dnDmy(k).slice(0, 5) + ")"; }
+function fillCallback() {
+  var box = $("tdCb");
+  if (!todayData || !box) return;
+  var d = todayData, t = todayNum(), all = cbLeads(d, t);
+  if (!all.length) { box.innerHTML = '<section class="card"><div class="eyebrow">Cần gọi lại</div><div class="small">Không có lead Chưa tư vấn hoặc Tiềm năng nào trong 14 ngày qua cần xử lý.</div></section>'; return; }
+  var byT = all.filter(function (l) { return cbF.tele === "all" || l.tele === cbF.tele; });
+  var cu = byT.filter(function (l) { return l.st === "untouched"; }).length, cp = byT.length - cu;
+  var names = [];
+  all.forEach(function (l) { if (l.tele && names.indexOf(l.tele) < 0) names.push(l.tele); });
+  var teleChips = names.length > 1 ? '<div class="presets"><button type="button" class="chip" data-cbt="all" aria-pressed="' + (cbF.tele === "all" ? "true" : "false") + '">Tất cả tele ' + all.length + '</button>' +
+    names.map(function (nm) { return '<button type="button" class="chip" data-cbt="' + esc(nm) + '" aria-pressed="' + (cbF.tele === nm ? "true" : "false") + '">' + esc(nm) + ' ' + all.filter(function (l) { return l.tele === nm; }).length + '</button>'; }).join("") + '</div>' : "";
+  var stChips = '<div class="presets">' + [["all", "Tất cả " + byT.length], ["untouched", "Chưa tư vấn " + cu], ["pot", "Tiềm năng " + cp]].map(function (c) {
+    return '<button type="button" class="chip" data-cbs="' + c[0] + '" aria-pressed="' + (cbF.st === c[0] ? "true" : "false") + '">' + c[1] + '</button>';
+  }).join("") + '</div>';
+  var list = byT.filter(function (l) { return cbF.st === "all" || l.st === cbF.st; }), shown = list.slice(0, cbF.limit);
+  box.innerHTML = '<section class="card"><div class="eyebrow">Cần gọi lại (' + n(all.length) + ')</div>' + teleChips + stChips +
+    '<div class="small" style="margin-bottom:8px">Lead về trong 14 ngày trước hôm nay, còn ở trạng thái Chưa tư vấn hoặc Tiềm năng. Đã loại khách có đặt hẹn hoặc hóa đơn cùng số điện thoại. Chưa tư vấn xếp trước, lead cũ hơn xếp trước.</div>' +
+    '<div class="tdlist">' + (shown.length ? shown.map(function (l) { return tdLeadCard(l, cbAge(t, l.n)); }).join("") +
+      (list.length > shown.length ? '<button type="button" class="apply" data-cbmore="1">Xem thêm ' + n(Math.min(20, list.length - shown.length)) + ' lead (còn ' + n(list.length - shown.length) + ')</button>' : "") : '<div class="small">Không có lead nào khớp bộ lọc.</div>') + '</div></section>';
+}
 function renderToday() {
   var d = todayData;
   if (!d) return;
@@ -1796,6 +1869,7 @@ function renderToday() {
   out.push('<section class="card"><div class="eyebrow">Theo dịch vụ hôm nay</div>' + (cards || '<div class="small">Hôm nay chưa có dịch vụ nào ghi chi tiêu.</div>') +
     '<div class="rows" style="margin-top:8px">' + kv("Việt kiều (chi tiêu)", vnd(T0.mk.vk)) + kv("Việt Nam (chi tiêu)", vnd(T0.mk.vn)) + (T0.mk[""] > 0 ? kv("Chưa ghi thị trường", vnd(T0.mk[""])) : "") + '</div></section>');
 
+  out.push('<div id="tdCb"></div>');
   out.push('<div id="tdData"></div>');
 
   var invT = d.inv.filter(function (x) { return x.n === t; });
@@ -1803,6 +1877,7 @@ function renderToday() {
     return '<div class="row"><span class="k">' + esc(x.name || "Chưa có tên") + '<br><span class="small">' + esc(x.key === "CHUA RO" ? "Chưa rõ dịch vụ" : sentence(d.names[x.key] || x.key)) + '</span></span><span class="v">' + vnd(x.amt) + '</span></div>';
   }).join("") + '</div>' : '<div class="small">Hôm nay chưa có hóa đơn nào.</div>') + '</section>');
   $("appToday").innerHTML = out.join("");
+  fillCallback();
   fillTodayData();
 }
 function loadToday() {
@@ -1826,6 +1901,9 @@ function initToday() {
     else if (b.hasAttribute("data-tdt")) { tdF.tele = b.getAttribute("data-tdt"); tdF.limit = 40; fillTodayData(); }
     else if (b.hasAttribute("data-tds")) { tdF.st = b.getAttribute("data-tds"); tdF.limit = 40; fillTodayData(); }
     else if (b.hasAttribute("data-tdmore")) { tdF.limit += 40; fillTodayData(); }
+    else if (b.hasAttribute("data-cbt")) { cbF.tele = b.getAttribute("data-cbt"); cbF.limit = 20; fillCallback(); }
+    else if (b.hasAttribute("data-cbs")) { cbF.st = b.getAttribute("data-cbs"); cbF.limit = 20; fillCallback(); }
+    else if (b.hasAttribute("data-cbmore")) { cbF.limit += 20; fillCallback(); }
   });
 }
 

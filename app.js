@@ -198,7 +198,7 @@ function authOk() { return !!anyToken(); }
 function saveTok() { try { sessionStorage.setItem("dorias_tok", JSON.stringify({ t: auth.token, exp: auth.exp })); } catch (e) {} }
 function clearTok() { auth.token = ""; auth.exp = 0; auth.wtoken = ""; auth.wexp = 0; try { sessionStorage.removeItem("dorias_tok"); localStorage.removeItem("dorias_tok"); } catch (e) {} }
 function wipeData() {
-  lastGood = lastDay = monthData = apptData = teleData = svcData = todayData = acctData = null;
+  lastGood = lastDay = monthData = apptData = teleData = svcData = todayData = acctData = acctState = null;
   svcMemo.p = null;
   ["app", "appDay", "appMonth", "appAppt", "appTele", "appSvc", "appToday", "appAcct"].forEach(function (id) { var el = $(id); if (el) el.innerHTML = ""; });
   var bn = $("banner"); if (bn) { bn.hidden = true; bn.innerHTML = ""; }
@@ -2165,7 +2165,35 @@ function initToday() {
 
 
 /* ---- Trang "Tài khoản": các tài khoản quảng cáo đang chạy trong ngày (đọc từ CHI_PHI_HANG_NGAY, không ghi) ---- */
-var acctData = null, busyAc = false, acOff = 0, acSvc = "all";
+var acctData = null, acctState = null, busyAc = false, acOff = 0, acSvc = "all", acSt = "all";
+var AC_STALE = 2 * 3600000, AC_HB = 45 * 60000;
+function parseTs(str) {
+  var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(String(str || "").trim());
+  return m ? Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)) - 7 * 3600000 : null;
+}
+API.getAcctState = function () {
+  return getVals("TRANG_THAI_TK!A2:G500").then(function (v) {
+    var rows = {}, hb = null, today = dnDmy(todayNum());
+    v.forEach(function (r, i) {
+      if (i === 0 && r[6]) hb = parseTs(r[6]);
+      var nm = sNorm(r[1]);
+      if (nm && String(r[0] || "").trim() === today) rows[nm] = { spend: sNum(r[2]), mess: sNum(r[3]), last: parseTs(r[4]) };
+    });
+    return { rows: rows, hb: hb, ok: true };
+  }).catch(function (e) {
+    if (e && (e.status === 400 || e.status === 404)) return { rows: {}, hb: null, ok: false };
+    throw e;
+  });
+};
+function acStatus(a, st) {
+  if (acOff !== 0) return { k: "past" };
+  var now = Date.now();
+  if (!st || !st.ok || !st.hb || now - st.hb > AC_HB) return { k: "unk" };
+  var r = st.rows[sNorm(a.name)];
+  if (!r) return { k: "run", last: now };
+  if (Math.round(r.spend) !== Math.round(a.tot != null ? a.tot : a.spend)) return { k: "run", last: now };
+  return { k: r.last != null && now - r.last < AC_STALE ? "run" : "off", last: r.last };
+}
 function acDay(d, k) {
   var m = {}, order = [];
   d.spend.forEach(function (x) {
@@ -2179,6 +2207,12 @@ function acDay(d, k) {
   });
   return { m: m, order: order };
 }
+function acPill(st) {
+  if (st.k === "run") return '<span class="pill good">Đang chạy</span>';
+  if (st.k === "off") return '<span class="pill warn">Đã tắt</span>';
+  if (st.k === "past") return '<span class="pill">Đã ghi chi tiêu</span>';
+  return '<span class="pill">Chưa theo dõi</span>';
+}
 function renderAcct() {
   var d = acctData, box = $("appAcct");
   if (!d || !box) return;
@@ -2190,10 +2224,15 @@ function renderAcct() {
   var shown = list.map(function (a) {
     if (acSvc === "all") return a;
     var sv = a.svc[acSvc];
-    return sv ? { name: a.name, spend: sv.spend, mess: sv.mess, svc: (function () { var o = {}; o[acSvc] = sv; return o; })() } : null;
+    return sv ? { name: a.name, spend: sv.spend, mess: sv.mess, tot: a.spend, svc: (function () { var o = {}; o[acSvc] = sv; return o; })() } : null;
   }).filter(Boolean).sort(function (a, b) { return b.spend - a.spend; });
   var sdata = {};
   d.spend.forEach(function (x) { if (x.n === k && !x.lump) sdata[x.key] = (sdata[x.key] || 0) + x.data; });
+  shown.forEach(function (a) { a.stt = acStatus(a, acctState); });
+  var live = acOff === 0 && acctState && acctState.ok && shown.some(function (a) { return a.stt.k !== "unk"; });
+  var nRun = shown.filter(function (a) { return a.stt.k === "run"; }).length, nOff = shown.filter(function (a) { return a.stt.k === "off"; }).length, allN = shown.length;
+  if (!live) acSt = "all";
+  if (live && acSt !== "all") shown = shown.filter(function (a) { return a.stt.k === acSt; });
   var totSp = 0, totMs = 0, totDa = 0, seenS = {};
   shown.forEach(function (a) {
     totSp += a.spend; totMs += a.mess;
@@ -2201,7 +2240,7 @@ function renderAcct() {
     Object.keys(a.svc).forEach(function (key) { a.da += sdata[key] || 0; if (!seenS[key]) { seenS[key] = 1; totDa += sdata[key] || 0; } });
   });
   var out = [];
-  out.push('<div class="hero"><div><div class="eyebrow">' + dnDmy(k) + ' · tài khoản đang chạy</div><div class="big">' + n(shown.length) + '</div></div>' +
+  out.push('<div class="hero"><div><div class="eyebrow">' + dnDmy(k) + ' · ' + (live ? 'đang chạy (' + n(nOff) + ' đã tắt)' : 'tài khoản có chi tiêu') + '</div><div class="big">' + n(live ? nRun : allN) + '</div></div>' +
     '<div class="hero-stats cols3"><div><div class="eyebrow">Chi tiêu</div><div class="v">' + mon(totSp) + '</div></div>' +
     '<div><div class="eyebrow">Mess</div><div class="v">' + n(Math.round(totMs)) + '</div></div>' +
     '<div><div class="eyebrow">Data</div><div class="v">' + n(Math.round(totDa)) + '</div></div></div></div>');
@@ -2210,20 +2249,24 @@ function renderAcct() {
   }).join("");
   var svcChips = svcKeys.length > 1 ? '<div class="presets"><button type="button" class="chip" data-acs="all" aria-pressed="' + (acSvc === "all" ? "true" : "false") + '">Tất cả dịch vụ</button>' +
     svcKeys.map(function (key) { return '<button type="button" class="chip" data-acs="' + esc(key) + '" aria-pressed="' + (acSvc === key ? "true" : "false") + '">' + esc(sentence(svcName_[key])) + '</button>'; }).join("") + '</div>' : "";
+  var stChips = live ? '<div class="presets">' + [["all", "Tất cả " + allN], ["run", "Đang chạy " + nRun], ["off", "Đã tắt " + nOff]].map(function (c) {
+    return '<button type="button" class="chip" data-acst="' + c[0] + '" aria-pressed="' + (acSt === c[0] ? "true" : "false") + '">' + c[1] + '</button>';
+  }).join("") + '</div>' : "";
   var cards = shown.map(function (a) {
     var p = prev.m[a.name], pSp = p ? (acSvc === "all" ? p.spend : (p.svc[acSvc] ? p.svc[acSvc].spend : 0)) : 0;
     var svcs = Object.keys(a.svc).map(function (key) { return esc(sentence(a.svc[key].name)) + (Object.keys(a.svc).length > 1 ? " " + mon(a.svc[key].spend) : ""); }).join(" · ");
-    return '<div class="svc"><div class="svc-h"><b>' + esc(a.name) + '</b><span class="pill good">Đang chạy</span></div>' +
+    return '<div class="svc"><div class="svc-h"><b>' + esc(a.name) + '</b>' + acPill(a.stt) + '</div>' +
       '<div class="svc-k c4"><div><div class="k">Chi tiêu</div><div class="v">' + vnd(a.spend) + '</div></div>' +
       '<div><div class="k">Mess</div><div class="v">' + n(Math.round(a.mess)) + '</div></div>' +
       '<div><div class="k">Data</div><div class="v">' + n(Math.round(a.da)) + '</div></div>' +
       '<div><div class="k">CP / mess</div><div class="v">' + dash(a.mess > 0 ? a.spend / a.mess : null, mon) + '</div></div></div>' +
-      '<div class="svc-sub"><span>' + svcs + '</span><span>Hôm trước <b>' + (pSp > 0 ? mon(pSp) : "-") + '</b></span></div></div>';
+      '<div class="svc-sub"><span>' + svcs + '</span><span>Hôm trước <b>' + (pSp > 0 ? mon(pSp) : "-") + '</b></span></div>' +
+      (a.stt.k === "run" || a.stt.k === "off" ? '<div class="small" style="margin-top:6px">' + (a.stt.k === "off" ? 'Chi tiêu không đổi từ ' : 'Chi tiêu đổi lần cuối ') + (a.stt.last ? hhmm(a.stt.last) : '-') + '</div>' : '') + '</div>';
   }).join("");
   var rankH = shown.length > 1 ? '<div class="vzt">Xếp hạng theo chi tiêu</div>' + vzRank(shown.map(function (a) { return { name: a.name, v: a.spend, sub: a.mess > 0 ? "CP/mess " + mon(a.spend / a.mess) : "chưa có mess" }; }), mon) : "";
-  out.push('<section class="card"><div class="eyebrow">Tài khoản quảng cáo</div><div class="presets">' + dayChips + '</div>' + svcChips + rankH +
+  out.push('<section class="card"><div class="eyebrow">Tài khoản quảng cáo</div><div class="presets">' + dayChips + '</div>' + svcChips + stChips + rankH +
     (cards || '<div class="small">Ngày này chưa có tài khoản nào ghi chi tiêu hoặc mess.</div>') +
-    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. Data tính theo dịch vụ, không theo tài khoản, nên các tài khoản chạy cùng một dịch vụ hiện cùng một số data. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
+    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. ' + (live ? 'Đang chạy là chi tiêu có thay đổi trong 2 giờ gần nhất, đã tắt là chi tiêu đứng yên từ 2 giờ trở lên (kiểm tra mỗi 15 phút). ' : 'Chưa có theo dõi trạng thái chạy hoặc tắt (cần bật đoạn Apps Script theo dõi). ') + 'Data tính theo dịch vụ, không theo tài khoản, nên các tài khoản chạy cùng một dịch vụ hiện cùng một số data. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
   var stopped = prev.order.filter(function (nm) { return !cur.m[nm]; });
   if (stopped.length && acOff === 0) out.push('<section class="card check"><div class="eyebrow">Đã dừng so với hôm qua</div><p class="verdict">' + stopped.map(function (nm) { return esc(nm) + " (hôm qua " + mon(prev.m[nm].spend) + ")"; }).join(", ") + '. Có thể chưa nhập chi tiêu hôm nay hoặc tài khoản đã tắt.</p></section>');
   box.innerHTML = out.join("");
@@ -2231,8 +2274,8 @@ function renderAcct() {
 function loadAcct() {
   if (busyAc) return;
   busyAc = true;
-  run("getService", []).then(function (res) {
-    acctData = res; renderAcct();
+  Promise.all([run("getService", []), run("getAcctState", []).catch(function () { return { rows: {}, hb: null, ok: false }; })]).then(function (rs) {
+    var res = rs[0]; acctData = res; acctState = rs[1]; renderAcct();
     if (view === "acct") { hideBanner(); updatePeriodText(); setStatus("live", "Đồng bộ với Google Sheets lúc " + hhmm(res.ts) + ". Tự làm mới mỗi phút."); }
   }).catch(function (err) {
     if (view !== "acct") return;
@@ -2247,6 +2290,7 @@ function initAcct() {
     if (!b) return;
     if (b.hasAttribute("data-aco")) { acOff = +b.getAttribute("data-aco"); renderAcct(); }
     else if (b.hasAttribute("data-acs")) { acSvc = b.getAttribute("data-acs"); renderAcct(); }
+    else if (b.hasAttribute("data-acst")) { acSt = b.getAttribute("data-acst"); renderAcct(); }
   });
 }
 

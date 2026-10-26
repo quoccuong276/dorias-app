@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://accounts.google.com/gsi/client; connect-src 'self' https://sheets.googleapis.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com/gsi/style; font-src https://fonts.gstatic.com; img-src 'self' data:; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex, nofollow">
+<style id="antiClickjack">html { display: none !important; }</style>
+<meta name="theme-color" content="#16385A">
+<title>DORIAS</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/icon-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="DORIAS">
+<script src="config.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&family=Playfair+Display:wght@600&display=swap">
+<style>
+/* Layout: một cột cho điện thoại. Hero doanh thu, lõi tài chính, phễu vẽ đúng tỷ lệ, lưới CPA, thanh chuyển đổi, thẻ dịch vụ. Số liệu đọc trực tiếp từ tab TONG_QUAN. */
+:root {
+  --bg: #EEF2F7;
+  --surface: #FFFFFF;
+  --ink: #12263F;
+  --muted: #5A6B80;
+  --line: #DCE3EC;
+  --navy: #1F4E79;
+  --hero-bg: #16385A;
+  --hero-fg: #FFFFFF;
+  --hero-muted: #A9C0D8;
+  --ads: #E0793B;
+  --good: #14907F;
+  --warn: #B7791F;
+  --warn-bg: #FFF4DC;
+  --bad: #C2412D;
+  --track: #E4EAF2;
+  --font-body: "Be Vietnam Pro", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-brand: "Playfair Display", Georgia, "Times New Roman", serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0B1626; --surface: #132238; --ink: #E7EEF7; --muted: #94A7BF; --line: #22364F;
+    --navy: #6FA6DB; --hero-bg: #1B3F66; --hero-fg: #FFFFFF; --hero-muted: #B4CAE0;
+    --ads: #F09560; --good: #3CC3AF; --warn: #F2B84B; --warn-bg: #3A2D12; --bad: #FF8A73;
+    --track: #1C3050; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0B1626; --surface: #132238; --ink: #E7EEF7; --muted: #94A7BF; --line: #22364F;
+  --navy: #6FA6DB; --hero-bg: #1B3F66; --hero-fg: #FFFFFF; --hero-muted: #B4CAE0;
+  --ads: #F09560; --good: #3CC3AF; --warn: #F2B84B; --warn-bg: #3A2D12; --bad: #FF8A73;
+  --track: #1C3050; color-scheme: dark;
+}
+
+/* Biểu đồ nhỏ */
+:root { --vz1: #2a78d6; --vz2: #eb6834; --vz3: #1baf7a; --vz4: #eda100; --vz5: #e87ba4; --vz-o: #9aa7b6; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --vz1: #3987e5; --vz2: #d95926; --vz3: #199e70; --vz4: #c98500; --vz5: #d55181; --vz-o: #5b6b80; } }
+:root[data-theme="dark"] { --vz1: #3987e5; --vz2: #d95926; --vz3: #199e70; --vz4: #c98500; --vz5: #d55181; --vz-o: #5b6b80; }
+.vzt { font-size: 12px; font-weight: 600; color: var(--muted); margin: 14px 0 2px; }
+.vz { position: relative; margin: 2px 0 8px; -webkit-tap-highlight-color: transparent; }
+.vz svg { display: block; width: 100%; height: auto; touch-action: pan-y; overflow: visible; }
+.vz text { font-size: 9.5px; fill: var(--muted); font-family: var(--font-body); }
+.vz .gl { stroke: var(--line); stroke-width: 1; }
+.vz .bl { stroke: var(--muted); stroke-width: 1; opacity: .45; }
+.vz .vzb { fill: var(--navy); fill-opacity: .5; }
+.vz .vzb.hi { fill-opacity: 1; }
+.vz .avg { stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.vz .ln { fill: none; stroke: var(--navy); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.vz .ar { fill: var(--navy); fill-opacity: .1; }
+.vz .mk { fill: var(--navy); stroke: var(--surface); stroke-width: 2; }
+.vz .gd { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 2 2; }
+.vz-tip { position: absolute; top: -6px; transform: translate(-50%, -100%); background: var(--ink); color: var(--surface); font-size: 12px; line-height: 1.4; padding: 6px 10px; border-radius: 8px; pointer-events: none; max-width: 270px; z-index: 5; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+.vz-tip[hidden] { display: none; }
+.vzs { display: flex; gap: 2px; height: 16px; border-radius: 8px; overflow: hidden; }
+.vzs i { display: block; height: 100%; min-width: 3px; }
+.vzl { display: flex; flex-direction: column; gap: 9px; margin-top: 14px; }
+.vzl .r { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.vzl .r i { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+.vzl .r .nm { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.vzl .r b { font-weight: 600; }
+.vzl .r .pc { width: 52px; text-align: right; color: var(--muted); font-size: 12px; }
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--font-body);
+  font-size: 14px; line-height: 1.45;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 28px;
+  font-variant-numeric: tabular-nums;
+}
+body::before {
+  content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px);
+  z-index: 10; background: var(--bg);
+}
+button { font: inherit; color: inherit; }
+.wrap { max-width: 560px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+#app { display: flex; flex-direction: column; gap: 14px; }
+header {
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; background: var(--bg);
+  padding-block: 14px 8px; display: flex; flex-direction: column; gap: 8px;
+}
+.head-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.brand { min-width: 0; }
+.brand b { font-family: var(--font-brand); font-size: 22px; letter-spacing: .14em; font-weight: 600; display: block; line-height: 1.1; }
+.brand span { color: var(--muted); font-size: 12px; }
+.period {
+  font-size: 12px; font-weight: 600; color: var(--navy); border: 1px solid var(--line);
+  background: var(--surface); border-radius: 999px; padding: 6px 12px; white-space: nowrap;
+}
+.statusbar { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); min-height: 32px; }
+.statusbar .txt { min-width: 0; flex: 1; }
+.sdot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); flex: none; }
+.sdot.live { background: var(--good); box-shadow: 0 0 0 3px rgba(20,144,127,.22); }
+.sdot.stale { background: var(--warn); }
+.refresh {
+  border: 1px solid var(--line); background: var(--surface); border-radius: 999px;
+  padding: 6px 12px; font-size: 12px; font-weight: 600; color: var(--navy); cursor: pointer; min-height: 32px; flex: none;
+}
+.refresh:focus-visible, .banner button:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.refresh[disabled] { opacity: .6; cursor: default; }
+.banner {
+  border: 1px solid var(--warn); background: var(--warn-bg); border-radius: 12px;
+  padding: 10px 12px; font-size: 12.5px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start;
+}
+.banner button { border: 1px solid var(--warn); background: transparent; border-radius: 999px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
+.hero { background: var(--hero-bg); color: var(--hero-fg); border-radius: 18px; padding: 20px 18px 18px; display: flex; flex-direction: column; gap: 16px; }
+.eyebrow { font-size: 11px; font-weight: 600; letter-spacing: .09em; text-transform: uppercase; }
+.card .eyebrow { color: var(--muted); }
+.hero .eyebrow { color: var(--hero-muted); }
+.hero .big { font-size: clamp(30px, 9.5vw, 40px); font-weight: 700; line-height: 1.05; margin-top: 4px; letter-spacing: -.01em; overflow-wrap: anywhere; }
+.hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.hero-stats > div { background: rgba(255,255,255,.09); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.hero-stats .v { font-size: 22px; font-weight: 700; margin-top: 2px; }
+.split { display: flex; height: 12px; border-radius: 6px; overflow: hidden; gap: 2px; }
+.split i { display: block; height: 100%; }
+.legend { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.legend div { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--hero-muted); }
+.legend div span:last-of-type { margin-left: auto; color: var(--hero-fg); font-weight: 600; }
+.dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+section.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.rows { display: flex; flex-direction: column; }
+.row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding-block: 11px; border-top: 1px solid var(--line); }
+.row:first-child { border-top: 0; padding-top: 0; }
+.row:last-child { padding-bottom: 0; }
+.row .k { color: var(--muted); min-width: 0; }
+.row .v { font-weight: 700; font-size: 16px; text-align: right; }
+.funnel { display: flex; flex-direction: column; gap: 14px; }
+.stage .top { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 5px; }
+.stage .name { font-weight: 600; }
+.stage .num { font-size: 20px; font-weight: 700; }
+.stage .note { color: var(--muted); font-size: 12px; margin-top: 4px; }
+.track { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; }
+.track i { display: block; height: 100%; border-radius: 5px; background: var(--navy); min-width: 4px; }
+.track i.ok { background: var(--good); }
+.track i.warn { background: var(--warn); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.tile { border: 1px solid var(--line); border-radius: 12px; padding: 12px; min-width: 0; }
+.tile .k { color: var(--muted); font-size: 12px; }
+.tile .v { font-size: clamp(17px, 5.2vw, 21px); font-weight: 700; margin-top: 4px; white-space: nowrap; }
+.conv { display: flex; flex-direction: column; gap: 14px; }
+.conv .top { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 6px; }
+.conv .top .l { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.conv .top b { font-size: 18px; }
+.pill { display: inline-block; font-size: 11px; font-weight: 600; border-radius: 999px; padding: 2px 9px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.good { color: var(--good); border-color: var(--good); }
+.pill.warn { color: var(--warn); border-color: var(--warn); }
+.svc { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 10px; }
+.svc-h { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.svc-h b { font-size: 15px; }
+.svc-k { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.svc-k.c4 { grid-template-columns: 1.35fr .7fr .7fr 1fr; gap: 6px; }
+.svc-k.c4 .v { font-size: 13.5px; }
+.svc-k .k { color: var(--muted); font-size: 11px; }
+.svc-k .v { font-size: 14px; font-weight: 700; overflow-wrap: anywhere; }
+.svc-sub { color: var(--muted); font-size: 12px; display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.svc-sub b { color: var(--ink); font-weight: 600; }
+.svc-sub b.bad { color: var(--bad); }
+.small { color: var(--muted); font-size: 12.5px; }
+.verdict { font-size: 13.5px; line-height: 1.6; margin: 0; }
+.foot { text-align: center; color: var(--muted); font-size: 11.5px; padding-top: 4px; }
+button.period { font-family: inherit; cursor: pointer; }
+button.period:disabled { cursor: default; }
+.period.menu::after { content: " \25BE"; }
+.period.menu[aria-expanded="true"]::after { content: " \25B4"; }
+.period:focus-visible, .chip:focus-visible, .apply:focus-visible, .dates input:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { border: 1px solid var(--line); background: var(--surface); color: var(--navy); border-radius: 999px; padding: 7px 12px; font-size: 12.5px; font-weight: 600; cursor: pointer; min-height: 34px; }
+.dates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.dates label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); min-width: 0; }
+.dates input { font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; min-width: 0; width: 100%; }
+.apply { background: var(--navy); color: var(--bg); border: 0; border-radius: 12px; padding: 12px 16px; font-weight: 700; font-size: 14px; cursor: pointer; min-height: 44px; }
+.apply:disabled { opacity: .6; cursor: default; }
+#rangeMsg:empty { display: none; }
+
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px)); }
+
+[hidden] { display: none !important; }
+#appDay { display: flex; flex-direction: column; gap: 14px; }
+.tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; background: var(--track); border-radius: 12px; padding: 3px; }
+.tab { border: 0; background: transparent; color: var(--muted); font-weight: 600; font-size: 13px; padding: 8px; border-radius: 9px; cursor: pointer; min-height: 36px; }
+.tab[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.14); }
+.tab:focus-visible, .dayl input:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.dayl { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.dayl input { font: inherit; font-size: 15px; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; min-width: 0; width: 100%; }
+#dayMsg:empty { display: none; }
+.hero-stats.cols3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cols3 .v { font-size: 20px; }
+.daynav { display: flex; gap: 8px; }
+.daynav .chip { flex: 1; }
+.cmp { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr) minmax(0, 1fr); gap: 8px 10px; align-items: baseline; }
+.cmp b { font-size: 12px; color: var(--muted); text-align: right; font-weight: 600; }
+.cmp .k { color: var(--muted); font-size: 12.5px; }
+.cmp .v { text-align: right; font-weight: 700; font-size: 14px; overflow-wrap: anywhere; }
+
+.tabs { display: flex; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.tabs::-webkit-scrollbar { display: none; }
+.tab { font-size: 12.5px; padding: 8px 12px; white-space: nowrap; flex: 1 0 auto; }
+.num.sm { font-size: 15px; }
+.delta { font-size: 12px; font-weight: 600; margin-left: 4px; }
+.bars.pair { gap: 1px; }
+.bars.pair .bar.rv { margin-right: 3px; }
+.bars.pair .bar.rv .bf { background: var(--good); }
+select.lsearch { appearance: auto; font-weight: 600; }
+.lsearch { width: 100%; box-sizing: border-box; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font: inherit; font-size: 14px; background: var(--surface); color: var(--ink); margin-bottom: 10px; }
+.lsearch:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+#leadBox .presets { margin-bottom: 8px; }
+#leadList { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+#leadList .apply { margin-top: 10px; }
+.legend2 { display: flex; gap: 16px; font-size: 12px; color: var(--muted); }
+.legend2 span { display: inline-flex; align-items: center; gap: 6px; }
+.legend2 i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+details.mrow { border-top: 1px solid var(--line); padding-block: 10px; }
+details.mrow:first-of-type { border-top: 0; padding-top: 0; }
+details.mrow summary { display: flex; justify-content: space-between; align-items: center; gap: 10px; cursor: pointer; list-style: none; min-height: 32px; }
+details.mrow summary::-webkit-details-marker { display: none; }
+details.mrow summary::after { content: "\25BE"; color: var(--muted); margin-left: 2px; }
+details.mrow[open] summary::after { content: "\25B4"; }
+details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+.mh { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; min-width: 0; }
+.mv { margin-left: auto; font-weight: 700; }
+.mbody { display: flex; flex-direction: column; gap: 10px; padding-top: 10px; }
+.pill.bad { color: var(--bad); border-color: var(--bad); }
+.card.check { border-color: var(--warn); }
+.card.check .eyebrow { color: var(--warn); }
+.card.check .verdict { font-size: 13px; line-height: 1.55; }
+.card.check .verdict + .verdict { border-top: 1px solid var(--line); padding-top: 10px; }
+#appMonth, #appAppt { display: flex; flex-direction: column; gap: 14px; }
+.appt { border: 1px solid var(--line); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.appt + .appt { margin-top: 0; }
+.appt-m { color: var(--muted); font-size: 12.5px; }
+.appt-m a { color: var(--navy); font-weight: 600; text-decoration: none; }
+.appt-n { font-size: 12.5px; background: var(--bg); border-radius: 8px; padding: 6px 8px; margin-top: 4px; overflow-wrap: anywhere; }
+#apptList { display: flex; flex-direction: column; gap: 10px; }
+.chip[aria-pressed="true"] { background: var(--navy); color: var(--bg); border-color: var(--navy); }
+.bars { display: flex; align-items: flex-end; gap: 2px; height: 84px; }
+.bar { flex: 1 1 0; min-width: 0; height: 100%; display: flex; align-items: flex-end; }
+.bf { width: 100%; background: var(--navy); border-radius: 3px 3px 0 0; min-height: 2px; display: flex; align-items: flex-end; overflow: hidden; }
+.bf i { display: block; width: 100%; background: var(--good); }
+.blabs { display: flex; gap: 2px; font-size: 9px; color: var(--muted); }
+.blabs span { flex: 1 1 0; min-width: 0; display: flex; justify-content: center; white-space: nowrap; }
+#apptMsg:empty { display: none; }
+
+.login { position: fixed; inset: 0; z-index: 30; background: var(--bg); display: flex; align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.login-card { max-width: 360px; width: 100%; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 28px 22px; display: flex; flex-direction: column; gap: 14px; }
+.login-card .logo { font-family: var(--font-brand); font-size: 28px; letter-spacing: .14em; font-weight: 600; }
+.login-card p { margin: 0; color: var(--muted); }
+.linkbtn { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 11.5px; cursor: pointer; padding: 8px; min-height: 32px; }
+.linkbtn:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+</style>
+</head>
+<body>
+
+
+<div class="login" id="login" hidden>
+  <div class="login-card">
+    <b class="logo">DORIAS</b>
+    <p>Báo cáo nội bộ. Đăng nhập bằng tài khoản Google đã được chia sẻ file sheet DORIAS.</p>
+    <button class="apply" id="loginBtn" type="button">Đăng nhập bằng Google</button>
+    <div class="small" id="loginMsg" role="status"></div>
+  </div>
+</div>
+<div class="wrap">
+  <header>
+    <div class="head-row">
+      <div class="brand"><b>DORIAS</b><span>Báo cáo tổng quan</span></div>
+      <button class="period" id="period" type="button" disabled></button>
+    </div>
+    <div class="statusbar">
+      <span class="sdot" id="sdot"></span>
+      <span class="txt" id="stxt"></span>
+      <button class="refresh" id="refresh" type="button" hidden>Làm mới</button>
+    </div>
+    <div class="tabs" role="tablist">
+      <button class="tab" id="tabTong" role="tab" aria-selected="true" type="button">Tổng quan</button>
+      <button class="tab" id="tabToday" role="tab" aria-selected="false" type="button">Hôm nay</button>
+      <button class="tab" id="tabAcct" role="tab" aria-selected="false" type="button">Tài khoản</button>
+      <button class="tab" id="tabNgay" role="tab" aria-selected="false" type="button">Theo ngày</button>
+      <button class="tab" id="tabThang" role="tab" aria-selected="false" type="button">Theo tháng</button>
+      <button class="tab" id="tabLich" role="tab" aria-selected="false" type="button">Lịch hẹn</button>
+      <button class="tab" id="tabTele" role="tab" aria-selected="false" type="button">Tele</button>
+      <button class="tab" id="tabSvc" role="tab" aria-selected="false" type="button">Dịch vụ</button>
+    </div>
+  </header>
+  <section class="card" id="range" hidden>
+    <div class="eyebrow">Kỳ báo cáo</div>
+    <div class="presets" id="presets"></div>
+    <div class="dates">
+      <label for="dFrom">Từ ngày<input type="date" id="dFrom"></label>
+      <label for="dTo">Đến ngày<input type="date" id="dTo"></label>
+    </div>
+    <div class="small" id="rangeMsg" role="status"></div>
+    <button class="apply" id="apply" type="button">Áp dụng</button>
+    <div class="small">Kỳ này được ghi vào ô D4 và F4 của sheet, nên mọi người xem dashboard sẽ thấy cùng một kỳ báo cáo.</div>
+  </section>
+  <section class="card" id="dayPanel" hidden>
+    <div class="eyebrow">Ngày báo cáo</div>
+    <div class="presets" id="dayPresets"></div>
+    <label class="dayl" for="dDay">Chọn ngày<input type="date" id="dDay"></label>
+    <div class="small" id="dayMsg" role="status"></div>
+    <button class="apply" id="applyDay" type="button">Áp dụng</button>
+    <div class="small">Ngày này được ghi vào ô C4 của tab BÁO CÁO THEO NGÀY, nên mọi người xem cùng một ngày.</div>
+  </section>
+  <section class="card" id="apptPanel" hidden>
+    <div class="eyebrow">Khoảng ngày hẹn</div>
+    <div class="presets" id="apptPresets"></div>
+    <div class="dates">
+      <label for="aFrom">Từ ngày<input type="date" id="aFrom"></label>
+      <label for="aTo">Đến ngày<input type="date" id="aTo"></label>
+    </div>
+    <div class="small" id="apptMsg" role="status"></div>
+    <button class="apply" id="applyAppt" type="button">Áp dụng</button>
+    <div class="small">Khoảng ngày này chỉ dùng để xem, không ghi vào sheet.</div>
+  </section>
+  <section class="card" id="telePanel" hidden>
+    <div class="eyebrow">Kỳ nhận lead</div>
+    <div class="presets" id="telePresets"></div>
+    <div class="dates">
+      <label for="tFrom">Từ ngày<input type="date" id="tFrom"></label>
+      <label for="tTo">Đến ngày<input type="date" id="tTo"></label>
+    </div>
+    <div class="small" id="teleMsg" role="status"></div>
+    <button class="apply" id="applyTele" type="button">Áp dụng</button>
+    <div class="small">Kỳ này tính theo ngày nhận lead (cột NGÀY), chỉ dùng để xem, không ghi vào sheet.</div>
+  </section>
+  <section class="card" id="svcPanel" hidden>
+    <div class="eyebrow">Kỳ báo cáo dịch vụ</div>
+    <div class="presets" id="svcPresets"></div>
+    <div class="dates">
+      <label for="sFrom">Từ ngày<input type="date" id="sFrom"></label>
+      <label for="sTo">Đến ngày<input type="date" id="sTo"></label>
+    </div>
+    <div class="small" id="svcMsg" role="status"></div>
+    <button class="apply" id="applySvc" type="button">Áp dụng</button>
+    <div class="small">Chi tiêu tính theo ngày chi, doanh thu tính theo ngày hóa đơn. Kỳ này chỉ dùng để xem, không ghi vào sheet.</div>
+  </section>
+  <div id="banner" hidden></div>
+  <div id="app"></div>
+  <div id="appDay" hidden></div>
+  <div id="appMonth" hidden></div>
+  <div id="appAppt" hidden></div>
+  <div id="appTele" hidden></div>
+  <div id="appSvc" hidden></div>
+  <div id="appToday" hidden></div>
+  <div id="appAcct" hidden></div>
+  <div class="foot" id="foot"></div>
+  <div class="foot"><button type="button" class="linkbtn" id="signout" hidden>Đăng xuất</button></div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

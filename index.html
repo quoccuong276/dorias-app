@@ -270,6 +270,48 @@ details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-off
 .login-card p { margin: 0; color: var(--muted); }
 .linkbtn { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 11.5px; cursor: pointer; padding: 8px; min-height: 32px; }
 .linkbtn:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
+  /* ===== GIAO DIỆN MÁY TÍNH (chỉ áp dụng khi màn hình >= 1024px) ===== */
+@media (min-width: 1024px) {
+  body { font-size: 15px; padding-left: 32px; padding-right: 32px; }
+  .wrap { max-width: 1240px; gap: 18px; }
+
+  /* Header: tab hiện đủ, không phải cuộn */
+  .brand b { font-size: 26px; }
+  .tabs { overflow: visible; }
+  .tab { font-size: 14px; padding: 10px 16px; flex: 1 1 0; }
+  .statusbar { font-size: 13px; }
+
+  /* Các ô chọn kỳ báo cáo: không kéo giãn hết chiều ngang */
+  #range, #dayPanel, #apptPanel, #telePanel, #svcPanel { max-width: 760px; }
+
+  /* Nội dung chính chia lưới 2 cột */
+  #app, #appDay, #appMonth, #appAppt, #appTele, #appSvc, #appToday, #appAcct {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+  }
+  #app > .hero, #appDay > .hero, #appMonth > .hero, #appAppt > .hero,
+  #appTele > .hero, #appSvc > .hero, #appToday > .hero, #appAcct > .hero,
+  #app > .banner, #app > .small, #app > .foot { grid-column: 1 / -1; }
+
+  .hero { padding: 26px 28px; }
+  .hero .big { font-size: 52px; }
+  .hero-stats .v { font-size: 26px; }
+  .hero-stats { gap: 16px; }
+
+  section.card { padding: 22px; }
+  .tile .v { font-size: 22px; }
+  .svc-k .v { font-size: 15px; }
+}
+
+/* Màn hình rất rộng: 3 cột */
+@media (min-width: 1500px) {
+  .wrap { max-width: 1480px; }
+  #app, #appDay, #appMonth, #appAppt, #appTele, #appSvc, #appToday, #appAcct {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
 </style>
 </head>
 <body>

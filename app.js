@@ -2192,13 +2192,19 @@ function renderAcct() {
     var sv = a.svc[acSvc];
     return sv ? { name: a.name, spend: sv.spend, mess: sv.mess, svc: (function () { var o = {}; o[acSvc] = sv; return o; })() } : null;
   }).filter(Boolean).sort(function (a, b) { return b.spend - a.spend; });
-  var totSp = 0, totMs = 0;
-  shown.forEach(function (a) { totSp += a.spend; totMs += a.mess; });
+  var sdata = {};
+  d.spend.forEach(function (x) { if (x.n === k && !x.lump) sdata[x.key] = (sdata[x.key] || 0) + x.data; });
+  var totSp = 0, totMs = 0, totDa = 0, seenS = {};
+  shown.forEach(function (a) {
+    totSp += a.spend; totMs += a.mess;
+    a.da = 0;
+    Object.keys(a.svc).forEach(function (key) { a.da += sdata[key] || 0; if (!seenS[key]) { seenS[key] = 1; totDa += sdata[key] || 0; } });
+  });
   var out = [];
   out.push('<div class="hero"><div><div class="eyebrow">' + dnDmy(k) + ' · tài khoản đang chạy</div><div class="big">' + n(shown.length) + '</div></div>' +
     '<div class="hero-stats cols3"><div><div class="eyebrow">Chi tiêu</div><div class="v">' + mon(totSp) + '</div></div>' +
     '<div><div class="eyebrow">Mess</div><div class="v">' + n(Math.round(totMs)) + '</div></div>' +
-    '<div><div class="eyebrow">CP / mess</div><div class="v">' + dash(totMs > 0 ? totSp / totMs : null, mon) + '</div></div></div></div>');
+    '<div><div class="eyebrow">Data</div><div class="v">' + n(Math.round(totDa)) + '</div></div></div></div>');
   var dayChips = [["Hôm nay", 0], ["Hôm qua", 1], ["2 ngày trước", 2]].map(function (c) {
     return '<button type="button" class="chip" data-aco="' + c[1] + '" aria-pressed="' + (acOff === c[1] ? "true" : "false") + '">' + c[0] + ' ' + dnDmy(t - c[1]).slice(0, 5) + '</button>';
   }).join("");
@@ -2208,15 +2214,16 @@ function renderAcct() {
     var p = prev.m[a.name], pSp = p ? (acSvc === "all" ? p.spend : (p.svc[acSvc] ? p.svc[acSvc].spend : 0)) : 0;
     var svcs = Object.keys(a.svc).map(function (key) { return esc(sentence(a.svc[key].name)) + (Object.keys(a.svc).length > 1 ? " " + mon(a.svc[key].spend) : ""); }).join(" · ");
     return '<div class="svc"><div class="svc-h"><b>' + esc(a.name) + '</b><span class="pill good">Đang chạy</span></div>' +
-      '<div class="svc-k"><div><div class="k">Chi tiêu</div><div class="v">' + vnd(a.spend) + '</div></div>' +
+      '<div class="svc-k c4"><div><div class="k">Chi tiêu</div><div class="v">' + vnd(a.spend) + '</div></div>' +
       '<div><div class="k">Mess</div><div class="v">' + n(Math.round(a.mess)) + '</div></div>' +
-      '<div><div class="k">CP / mess</div><div class="v">' + dash(a.mess > 0 ? a.spend / a.mess : null, vnd) + '</div></div></div>' +
+      '<div><div class="k">Data</div><div class="v">' + n(Math.round(a.da)) + '</div></div>' +
+      '<div><div class="k">CP / mess</div><div class="v">' + dash(a.mess > 0 ? a.spend / a.mess : null, mon) + '</div></div></div>' +
       '<div class="svc-sub"><span>' + svcs + '</span><span>Hôm trước <b>' + (pSp > 0 ? mon(pSp) : "-") + '</b></span></div></div>';
   }).join("");
   var rankH = shown.length > 1 ? '<div class="vzt">Xếp hạng theo chi tiêu</div>' + vzRank(shown.map(function (a) { return { name: a.name, v: a.spend, sub: a.mess > 0 ? "CP/mess " + mon(a.spend / a.mess) : "chưa có mess" }; }), mon) : "";
   out.push('<section class="card"><div class="eyebrow">Tài khoản quảng cáo</div><div class="presets">' + dayChips + '</div>' + svcChips + rankH +
     (cards || '<div class="small">Ngày này chưa có tài khoản nào ghi chi tiêu hoặc mess.</div>') +
-    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
+    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. Data tính theo dịch vụ, không theo tài khoản, nên các tài khoản chạy cùng một dịch vụ hiện cùng một số data. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
   var stopped = prev.order.filter(function (nm) { return !cur.m[nm]; });
   if (stopped.length && acOff === 0) out.push('<section class="card check"><div class="eyebrow">Đã dừng so với hôm qua</div><p class="verdict">' + stopped.map(function (nm) { return esc(nm) + " (hôm qua " + mon(prev.m[nm].spend) + ")"; }).join(", ") + '. Có thể chưa nhập chi tiêu hôm nay hoặc tài khoản đã tắt.</p></section>');
   box.innerHTML = out.join("");

@@ -2166,7 +2166,7 @@ function initToday() {
 
 /* ---- Trang "Tài khoản": các tài khoản quảng cáo đang chạy trong ngày (đọc từ CHI_PHI_HANG_NGAY, không ghi) ---- */
 var acctData = null, acctState = null, busyAc = false, acOff = 0, acSvc = "all", acSt = "all";
-var AC_STALE = 2 * 3600000, AC_HB = 45 * 60000;
+var AC_IDLE = 3 * 3600000, AC_GAP = 45 * 60000, AC_HB = 45 * 60000;
 function parseTs(str) {
   var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(String(str || "").trim());
   return m ? Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)) - 7 * 3600000 : null;
@@ -2179,7 +2179,9 @@ API.getAcctState = function () {
       var nm = sNorm(r[1]);
       if (nm && String(r[0] || "").trim() === today) rows[nm] = { spend: sNum(r[2]), mess: sNum(r[3]), last: parseTs(r[4]) };
     });
-    return { rows: rows, hb: hb, ok: true };
+    var gl = 0;
+    Object.keys(rows).forEach(function (k) { if (rows[k].last && rows[k].last > gl) gl = rows[k].last; });
+    return { rows: rows, hb: hb, gl: gl || null, ok: true };
   }).catch(function (e) {
     if (e && (e.status === 400 || e.status === 404)) return { rows: {}, hb: null, ok: false };
     throw e;
@@ -2192,7 +2194,10 @@ function acStatus(a, st) {
   var r = st.rows[sNorm(a.name)];
   if (!r) return { k: "run", last: now };
   if (Math.round(r.spend) !== Math.round(a.tot != null ? a.tot : a.spend)) return { k: "run", last: now };
-  return { k: r.last != null && now - r.last < AC_STALE ? "run" : "off", last: r.last };
+  if (r.last == null) return { k: "unk" };
+  /* Chi tiêu được nhập vài giờ một lần, nên xét "tắt" khi: các tài khoản khác đã được cập nhật mà tài khoản này đứng yên, hoặc cả hệ thống quá 3 giờ không đổi */
+  var off = (st.gl && st.gl - r.last >= AC_GAP) || now - r.last >= AC_IDLE;
+  return { k: off ? "off" : "run", last: r.last };
 }
 function acDay(d, k) {
   var m = {}, order = [];
@@ -2266,7 +2271,7 @@ function renderAcct() {
   var rankH = shown.length > 1 ? '<div class="vzt">Xếp hạng theo chi tiêu</div>' + vzRank(shown.map(function (a) { return { name: a.name, v: a.spend, sub: a.mess > 0 ? "CP/mess " + mon(a.spend / a.mess) : "chưa có mess" }; }), mon) : "";
   out.push('<section class="card"><div class="eyebrow">Tài khoản quảng cáo</div><div class="presets">' + dayChips + '</div>' + svcChips + stChips + rankH +
     (cards || '<div class="small">Ngày này chưa có tài khoản nào ghi chi tiêu hoặc mess.</div>') +
-    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. ' + (live ? 'Đang chạy là chi tiêu có thay đổi trong 2 giờ gần nhất, đã tắt là chi tiêu đứng yên từ 2 giờ trở lên (kiểm tra mỗi 15 phút). ' : 'Chưa có theo dõi trạng thái chạy hoặc tắt (cần bật đoạn Apps Script theo dõi). ') + 'Data tính theo dịch vụ, không theo tài khoản, nên các tài khoản chạy cùng một dịch vụ hiện cùng một số data. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
+    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. ' + (live ? 'Đang chạy là chi tiêu còn tăng ở lần cập nhật gần nhất. Đã tắt là chi tiêu đứng yên trong khi các tài khoản khác đã được cập nhật, hoặc quá 3 giờ không đổi (kiểm tra mỗi 15 phút). ' : 'Chưa có theo dõi trạng thái chạy hoặc tắt (cần bật đoạn Apps Script theo dõi). ') + 'Data tính theo dịch vụ, không theo tài khoản, nên các tài khoản chạy cùng một dịch vụ hiện cùng một số data. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
   var stopped = prev.order.filter(function (nm) { return !cur.m[nm]; });
   if (stopped.length && acOff === 0) out.push('<section class="card check"><div class="eyebrow">Đã dừng so với hôm qua</div><p class="verdict">' + stopped.map(function (nm) { return esc(nm) + " (hôm qua " + mon(prev.m[nm].spend) + ")"; }).join(", ") + '. Có thể chưa nhập chi tiêu hôm nay hoặc tài khoản đã tắt.</p></section>');
   box.innerHTML = out.join("");

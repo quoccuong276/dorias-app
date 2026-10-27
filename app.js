@@ -2166,7 +2166,7 @@ function initToday() {
 
 /* ---- Trang "Tài khoản": các tài khoản quảng cáo đang chạy trong ngày (đọc từ CHI_PHI_HANG_NGAY, không ghi) ---- */
 var acctData = null, acctState = null, busyAc = false, acOff = 0, acSvc = "all", acSt = "all";
-var AC_IDLE = 3 * 3600000, AC_GAP = 45 * 60000, AC_HB = 45 * 60000;
+var AC_IDLE = 3 * 3600000, AC_GAP = 45 * 60000, AC_HB = 45 * 60000, AC_MIN = 5000; /* AC_MIN: chi tiêu tăng dưới mức này (đồng) coi là nhích lặt vặt, không tính là đang chạy */
 function parseTs(str) {
   var m = /^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2}))?/.exec(String(str || "").trim());
   return m ? Date.UTC(+m[3], +m[2] - 1, +m[1], +(m[4] || 0), +(m[5] || 0)) - 7 * 3600000 : null;
@@ -2193,7 +2193,7 @@ function acStatus(a, st) {
   if (!st || !st.ok || !st.hb || now - st.hb > AC_HB) return { k: "unk" };
   var r = st.rows[sNorm(a.name)];
   if (!r) return { k: "run", last: now };
-  if (Math.round(r.spend) !== Math.round(a.tot != null ? a.tot : a.spend)) return { k: "run", last: now };
+  if (Math.abs(Math.round(r.spend) - Math.round(a.tot != null ? a.tot : a.spend)) >= AC_MIN) return { k: "run", last: now };
   if (r.last == null) return { k: "unk" };
   /* Chi tiêu được nhập vài giờ một lần, nên xét "tắt" khi: các tài khoản khác đã được cập nhật mà tài khoản này đứng yên, hoặc cả hệ thống quá 3 giờ không đổi */
   var off = (st.gl && st.gl - r.last >= AC_GAP) || now - r.last >= AC_IDLE;
@@ -2238,11 +2238,14 @@ function renderAcct() {
   var nRun = shown.filter(function (a) { return a.stt.k === "run"; }).length, nOff = shown.filter(function (a) { return a.stt.k === "off"; }).length, allN = shown.length;
   if (!live) acSt = "all";
   if (live && acSt !== "all") shown = shown.filter(function (a) { return a.stt.k === acSt; });
-  var totSp = 0, totMs = 0, totDa = 0, seenS = {};
+  /* Data tính theo dịch vụ: gán cho 1 tài khoản duy nhất của dịch vụ đó (tài khoản chi tiêu nhiều nhất) để khỏi bị lặp ở mọi tài khoản */
+  var own = {};
+  list.forEach(function (a) { Object.keys(a.svc).forEach(function (key) { var sp = a.svc[key].spend; if (!own[key] || sp > own[key].s) own[key] = { n: a.name, s: sp }; }); });
+  var totSp = 0, totMs = 0, totDa = 0;
   shown.forEach(function (a) {
     totSp += a.spend; totMs += a.mess;
-    a.da = 0;
-    Object.keys(a.svc).forEach(function (key) { a.da += sdata[key] || 0; if (!seenS[key]) { seenS[key] = 1; totDa += sdata[key] || 0; } });
+    a.da = 0; a.owns = false;
+    Object.keys(a.svc).forEach(function (key) { if (own[key] && own[key].n === a.name) { a.owns = true; a.da += sdata[key] || 0; totDa += sdata[key] || 0; } });
   });
   var out = [];
   out.push('<div class="hero"><div><div class="eyebrow">' + dnDmy(k) + ' · ' + (live ? 'đang chạy (' + n(nOff) + ' đã tắt)' : 'tài khoản có chi tiêu') + '</div><div class="big">' + n(live ? nRun : allN) + '</div></div>' +
@@ -2263,7 +2266,7 @@ function renderAcct() {
     return '<div class="svc"><div class="svc-h"><b>' + esc(a.name) + '</b>' + acPill(a.stt) + '</div>' +
       '<div class="svc-k c4"><div><div class="k">Chi tiêu</div><div class="v">' + vnd(a.spend) + '</div></div>' +
       '<div><div class="k">Mess</div><div class="v">' + n(Math.round(a.mess)) + '</div></div>' +
-      '<div><div class="k">Data</div><div class="v">' + n(Math.round(a.da)) + '</div></div>' +
+      '<div><div class="k">Data</div><div class="v">' + (a.owns ? n(Math.round(a.da)) : "-") + '</div></div>' +
       '<div><div class="k">CP / mess</div><div class="v">' + dash(a.mess > 0 ? a.spend / a.mess : null, mon) + '</div></div></div>' +
       '<div class="svc-sub"><span>' + svcs + '</span><span>Hôm trước <b>' + (pSp > 0 ? mon(pSp) : "-") + '</b></span></div>' +
       (a.stt.k === "run" || a.stt.k === "off" ? '<div class="small" style="margin-top:6px">' + (a.stt.k === "off" ? 'Chi tiêu không đổi từ ' : 'Chi tiêu đổi lần cuối ') + (a.stt.last ? hhmm(a.stt.last) : '-') + '</div>' : '') + '</div>';
@@ -2271,7 +2274,7 @@ function renderAcct() {
   var rankH = shown.length > 1 ? '<div class="vzt">Xếp hạng theo chi tiêu</div>' + vzRank(shown.map(function (a) { return { name: a.name, v: a.spend, sub: a.mess > 0 ? "CP/mess " + mon(a.spend / a.mess) : "chưa có mess" }; }), mon) : "";
   out.push('<section class="card"><div class="eyebrow">Tài khoản quảng cáo</div><div class="presets">' + dayChips + '</div>' + svcChips + stChips + rankH +
     (cards || '<div class="small">Ngày này chưa có tài khoản nào ghi chi tiêu hoặc mess.</div>') +
-    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. ' + (live ? 'Đang chạy là chi tiêu còn tăng ở lần cập nhật gần nhất. Đã tắt là chi tiêu đứng yên trong khi các tài khoản khác đã được cập nhật, hoặc quá 3 giờ không đổi (kiểm tra mỗi 15 phút). ' : 'Chưa có theo dõi trạng thái chạy hoặc tắt (cần bật đoạn Apps Script theo dõi). ') + 'Data tính theo dịch vụ, không theo tài khoản, nên các tài khoản chạy cùng một dịch vụ hiện cùng một số data. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
+    '<div class="small">Chỉ hiện tài khoản có chi tiêu hoặc mess trong ngày, theo tab CHI_PHI_HANG_NGAY. ' + (live ? 'Đang chạy là chi tiêu còn tăng từ 5.000đ trở lên ở lần cập nhật gần nhất (bỏ qua nhích vài trăm đồng). Đã tắt là chi tiêu đứng yên trong khi các tài khoản khác đã được cập nhật, hoặc quá 3 giờ không đổi (kiểm tra mỗi 15 phút). ' : 'Chưa có theo dõi trạng thái chạy hoặc tắt (cần bật đoạn Apps Script theo dõi). ') + 'Data tính theo dịch vụ, không theo tài khoản, nên số data của mỗi dịch vụ chỉ được ghi vào tài khoản chi tiêu nhiều nhất của dịch vụ đó. "Hôm trước" là chi tiêu của chính tài khoản đó ngày liền trước.</div></section>');
   var stopped = prev.order.filter(function (nm) { return !cur.m[nm]; });
   if (stopped.length && acOff === 0) out.push('<section class="card check"><div class="eyebrow">Đã dừng so với hôm qua</div><p class="verdict">' + stopped.map(function (nm) { return esc(nm) + " (hôm qua " + mon(prev.m[nm].spend) + ")"; }).join(", ") + '. Có thể chưa nhập chi tiêu hôm nay hoặc tài khoản đã tắt.</p></section>');
   box.innerHTML = out.join("");

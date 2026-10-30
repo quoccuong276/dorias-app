@@ -77,11 +77,11 @@ function render(m, meta, sd) {
       parts.map(function (p) { return '<div><span class="dot" style="background:' + p.c + '"></span><span>' + p.k + '</span><span>' + vnd(p.v) + '</span></div>'; }).join("") +
       '</div></div>';
   }
-  out.push('<div class="hero"><div><div class="eyebrow">Tổng doanh thu</div><div class="big">' + esc(f[1]) + '</div></div>' +
+  out.push('<div class="hero ov-hero"><div><div class="eyebrow">Tổng doanh thu</div><div class="big">' + esc(f[1]) + '</div></div>' +
     '<div class="hero-stats"><div><div class="eyebrow">ROAS</div><div class="v">' + esc(f[3]) + '</div></div>' +
     '<div><div class="eyebrow">Ads / doanh thu</div><div class="v">' + esc(f[4]) + '</div></div></div>' + heroSplit + '</div>');
 
-  out.push('<section class="card"><div class="eyebrow">Lõi tài chính</div><div class="rows">' +
+  out.push('<section class="card ov-loi"><div class="eyebrow">Lõi tài chính</div><div class="rows">' +
     [["Tổng chi phí ads", f[2]], ["Chi phí ads + phí ngân hàng", f[5]], ["Ads / doanh thu thực tế", f[6]]].map(function (r) {
       return '<div class="row"><span class="k">' + r[0] + '</span><span class="v">' + esc(r[1]) + '</span></div>';
     }).join("") + '</div></section>');
@@ -94,14 +94,14 @@ function render(m, meta, sd) {
     { name: "Lịch hẹn", v: appts, note: ratio(appts, data) + " so với data" },
     { name: "Khách đến", v: arrived, note: ratio(arrived, appts) + " so với lịch hẹn", ok: true }
   ];
-  out.push('<section class="card"><div class="eyebrow">Phễu sản lượng</div><div class="funnel">' + stages.map(function (s) {
+  out.push('<section class="card ov-funnel"><div class="eyebrow">Phễu sản lượng</div><div class="funnel">' + stages.map(function (s) {
     var w = mess > 0 ? Math.max(s.v / mess * 100, 1.5) : 1.5;
     return '<div class="stage"><div class="top"><span class="name">' + s.name + '</span><span class="num">' + n(s.v) + '</span></div>' +
       '<div class="track"><i class="' + (s.ok ? "ok" : "") + '" style="width:' + w.toFixed(2) + '%"></i></div><div class="note">' + s.note + '</div></div>';
   }).join("") + '</div></section>');
 
   if (m.cpa) {
-    out.push('<section class="card"><div class="eyebrow">Chi phí trên mỗi kết quả</div><div class="grid">' +
+    out.push('<section class="card ov-cpa"><div class="eyebrow">Chi phí trên mỗi kết quả</div><div class="grid">' +
       [["CP / mess", m.cpa[1]], ["CP / data", m.cpa[2]], ["CP / hẹn", m.cpa[3]], ["CP / khách đến", m.cpa[4]]].map(function (r) {
         return '<div class="tile"><div class="k">' + r[0] + '</div><div class="v">' + esc(r[1]) + '</div></div>';
       }).join("") + '</div></section>');
@@ -110,7 +110,7 @@ function render(m, meta, sd) {
   if (m.conv) {
     var names = ["Data / mess", "Hẹn / data", "Đến / hẹn"];
     var lost = Math.max(appts - arrived, 0);
-    out.push('<section class="card"><div class="eyebrow">Tỷ lệ chuyển đổi</div><div class="conv">' + names.map(function (nm, i) {
+    out.push('<section class="card ov-conv"><div class="eyebrow">Tỷ lệ chuyển đổi</div><div class="conv">' + names.map(function (nm, i) {
       var val = m.conv[i + 1], p = num(val) || 0, b = m.bott[i], pill = "";
       if (b) {
         var bad = U(b[3]).indexOf("NGHẼN") >= 0;
@@ -147,12 +147,12 @@ function render(m, meta, sd) {
     var notes = [];
     if (other && num(other[7])) notes.push('Doanh thu không chạy ads (khác): <b>' + esc(T(other[7]).replace(/\s*đ$/, "")) + 'đ</b>');
     if (idle.length) notes.push('Chưa phát sinh ads: ' + idle.map(function (x) { return esc(sentence(x)); }).join(", "));
-    out.push('<section class="card"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards +
+    out.push('<section class="card ov-svc"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards +
       (notes.length ? '<div class="small">' + notes.join("<br>") + '</div>' : '') + '</section>');
   }
   }
 
-  if (m.verdict) out.push('<section class="card"><div class="eyebrow">Nhận định từ sheet</div><p class="verdict">' + esc(m.verdict) + '</p></section>');
+  if (m.verdict) out.push('<section class="card ov-verdict"><div class="eyebrow">Nhận định từ sheet</div><p class="verdict">' + esc(m.verdict) + '</p></section>');
 
   $("app").innerHTML = out.join("");
 }
@@ -195,7 +195,7 @@ function ovSvc(m, sd) {
   if (sr != null && Math.abs(sr - all.rev) > 1000) notes.push('Lưu ý: doanh thu cộng từ hóa đơn là ' + vnd(all.rev) + ', khác số trên sheet (' + vnd(sr) + ').');
   if (sa != null && Math.abs(sa - all.sp.spend) > 1000) notes.push('Lưu ý: chi ads cộng từ dữ liệu gốc là ' + vnd(all.sp.spend) + ', khác số trên sheet (' + vnd(sa) + ').');
   if (!cards && !notes.length) return "";
-  return '<section class="card"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards + (notes.length ? '<div class="small">' + notes.join("<br>") + '</div>' : '') + '</section>';
+  return '<section class="card ov-svc"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards + (notes.length ? '<div class="small">' + notes.join("<br>") + '</div>' : '') + '</section>';
 }
 
 function setStatus(kind, text) {

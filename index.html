@@ -270,39 +270,65 @@ details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-off
 .login-card p { margin: 0; color: var(--muted); }
 .linkbtn { background: none; border: 0; color: var(--muted); text-decoration: underline; font-size: 11.5px; cursor: pointer; padding: 8px; min-height: 32px; }
 .linkbtn:focus-visible { outline: 2px solid var(--navy); outline-offset: 2px; }
-  /* ===== GIAO DIỆN MÁY TÍNH v2 (masonry, chỉ từ 1024px) ===== */
+  /* ===== GIAO DIỆN MÁY TÍNH v3: menu dọc bên trái, nội dung bên phải (chỉ từ 1024px) ===== */
 @media (min-width: 1024px) {
-  body { font-size: 15px; padding-left: 32px; padding-right: 32px; }
-  .wrap { max-width: 1240px; gap: 18px; }
+  body { font-size: 15px; padding-left: 280px; padding-right: 32px; }
+  .wrap { max-width: 1460px; gap: 18px; }
 
+  /* Menu bên trái, cố định khi cuộn */
+  header { position: static; padding-block: 18px 6px; flex-direction: row; align-items: center; gap: 16px; background: transparent; }
+  .head-row { order: 2; flex: none; }
+  .statusbar { order: 1; flex: 1; min-width: 0; font-size: 13px; }
+  .brand { position: fixed; top: 22px; left: 28px; width: 220px; z-index: 6; }
   .brand b { font-size: 26px; }
-  .tabs { overflow: visible; }
-  .tab { font-size: 14px; padding: 10px 16px; flex: 1 1 0; }
-  .statusbar { font-size: 13px; }
+  .tabs {
+    position: fixed; top: 92px; left: 28px; width: 220px; z-index: 6;
+    display: flex; flex-direction: column; gap: 4px; overflow: visible;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 16px; padding: 10px;
+  }
+  .tab { flex: none; text-align: left; font-size: 14px; padding: 11px 14px; border-radius: 10px; min-height: 40px; }
+  .tab:hover { background: var(--track); color: var(--ink); }
+  .tab[aria-selected="true"] { background: var(--navy); color: #fff; box-shadow: none; }
   #range, #dayPanel, #apptPanel, #telePanel, #svcPanel { max-width: 760px; }
 
-  /* Nội dung: cột xếp gạch, thẻ tự lấp chỗ trống */
-  #app, #appDay, #appMonth, #appAppt, #appTele, #appSvc, #appToday, #appAcct {
-    display: block;
-    column-count: 2;
-    column-gap: 18px;
+  /* Các tab khác: cột xếp gạch */
+  #appDay, #appMonth, #appAppt, #appTele, #appSvc, #appToday, #appAcct {
+    display: block; column-count: 2; column-gap: 18px;
   }
-  #app > *, #appDay > *, #appMonth > *, #appAppt > *,
-  #appTele > *, #appSvc > *, #appToday > *, #appAcct > * {
-    break-inside: avoid;
-    margin: 0 0 18px;
-    min-width: 0;
+  #appDay > *, #appMonth > *, #appAppt > *, #appTele > *, #appSvc > *, #appToday > *, #appAcct > * {
+    break-inside: avoid; margin: 0 0 18px; min-width: 0;
   }
-  /* Thẻ lớn trải toàn chiều ngang */
-  #app > .hero, #appDay > .hero, #appMonth > .hero, #appAppt > .hero,
-  #appTele > .hero, #appSvc > .hero, #appToday > .hero, #appAcct > .hero,
-  #app > .banner, #app > .foot, #appSvc > .foot {
-    column-span: all;
-  }
-  /* Thẻ có bảng rộng thì cuộn ngang thay vì tràn */
-  section.card { overflow-x: auto; padding: 22px; }
+  #appDay > .hero, #appMonth > .hero, #appAppt > .hero, #appTele > .hero, #appSvc > .hero, #appToday > .hero, #appAcct > .hero,
+  #appSvc > .foot { column-span: all; }
+  section.card { overflow-x: auto; padding: 20px; }
 
-  .hero { padding: 26px 28px; }
+  /* Tab Tổng quan: gọn trong một trang */
+  #app {
+    display: grid; grid-template-columns: 1fr 1.05fr 1fr; gap: 16px; align-items: stretch;
+    grid-template-areas: "hero hero hero" "loi funnel conv" "cpa funnel svc" "verdict verdict verdict";
+  }
+  #app > * { min-width: 0; margin: 0; }
+  #app > .ov-hero { grid-area: hero; display: grid; grid-template-columns: 1.35fr 1fr 1.35fr; gap: 26px; align-items: center; padding: 22px 28px; }
+  #app > .ov-hero .big { font-size: 38px; white-space: nowrap; overflow-wrap: normal; }
+  #app > .ov-hero .hero-stats { grid-template-columns: 1fr 1fr; gap: 12px; }
+  #app > .ov-hero .hero-stats .v { font-size: 24px; }
+  #app > .ov-loi { grid-area: loi; }
+  #app > .ov-funnel { grid-area: funnel; grid-row: 2 / span 2; }
+  #app > .ov-conv { grid-area: conv; }
+  #app > .ov-cpa { grid-area: cpa; }
+  #app > .ov-svc { grid-area: svc; }
+  #app > .ov-verdict { grid-area: verdict; }
+  #app > .ov-cpa .tile .v { font-size: 19px; }
+  #app > .ov-svc .svc-k .v { font-size: 12.5px; white-space: nowrap; overflow-wrap: normal; }
+  #app > .ov-svc .svc-k { gap: 6px; }
+  #app > .banner, #app > .foot { grid-column: 1 / -1; }
+  #app > section.card { padding: 16px; gap: 12px; overflow: visible; }
+  #app > .ov-svc .svc { padding: 10px 12px; gap: 8px; }
+  #app > .ov-svc .svc-sub { font-size: 11.5px; gap: 2px 10px; }
+  #app > .ov-funnel .funnel { gap: 12px; }
+  #app > .ov-cpa .tile { padding: 10px; }
+
+  .hero { padding: 24px 28px; }
   .hero .big { font-size: 52px; }
   .hero-stats .v { font-size: 26px; }
   .hero-stats { gap: 16px; }
@@ -310,10 +336,9 @@ details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-off
   .svc-k .v { font-size: 15px; }
 }
 
-/* Màn hình rộng: 3 cột (trừ tab Dịch vụ và Tài khoản có bảng/danh sách dài) */
-@media (min-width: 1500px) {
-  .wrap { max-width: 1480px; }
-  #app, #appDay, #appMonth, #appAppt, #appTele, #appToday { column-count: 3; }
+/* Màn hình rộng: các tab xếp gạch dùng 3 cột */
+@media (min-width: 1760px) {
+  #appDay, #appMonth, #appAppt, #appTele, #appToday { column-count: 3; }
 }
 </style>
 </head>

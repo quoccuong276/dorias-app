@@ -56,7 +56,7 @@ function parse(rows) {
   return m;
 }
 
-function render(m, meta) {
+function render(m, meta, sd) {
   var f = m.fin, fu = m.funnel, out = [];
   $("period").textContent = (m.from ? m.from.slice(0, 5) : "") + " – " + m.to;
 
@@ -121,6 +121,8 @@ function render(m, meta) {
     }).join("") + '<div class="row" style="border-top:1px solid var(--line);padding-top:12px"><span class="k">Khách rớt (hẹn nhưng không đến)</span><span class="v">' + n(lost) + ' khách</span></div></div></section>');
   }
 
+  var ovr = ovSvc(m, sd);
+  if (ovr) out.push(ovr); else {
   var active = [], idle = [], other = null;
   m.svc.forEach(function (r) {
     var name = U(r[1]);
@@ -148,10 +150,52 @@ function render(m, meta) {
     out.push('<section class="card"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards +
       (notes.length ? '<div class="small">' + notes.join("<br>") + '</div>' : '') + '</section>');
   }
+  }
 
   if (m.verdict) out.push('<section class="card"><div class="eyebrow">Nhận định từ sheet</div><p class="verdict">' + esc(m.verdict) + '</p></section>');
 
   $("app").innerHTML = out.join("");
+}
+
+/* Chi tiết dịch vụ của tab Tổng quan: tính lại từ dữ liệu gốc (chi tiêu, DATA_SALE, HÓA ĐƠN) để hóa đơn trống dịch vụ được xếp theo lead, phần còn lại vào KHÁC */
+function ovSvc(m, sd) {
+  var pf = ymdOf(m.from), pt = ymdOf(m.to);
+  if (!sd || !sd.names || !pf || !pt || !pf.y || !pt.y) return "";
+  var a = dnum(pf.y, pf.m, pf.d), b = dnum(pt.y, pt.m, pt.d), rows = [], used = {};
+  Object.keys(sd.names).forEach(function (k) {
+    if (k === "CHUA RO") return;
+    var c = svcCalc(sd, k, a, b);
+    if (!(c.sp.spend > 0 || c.rev > 0)) return;
+    var ls = sd.leads.filter(function (l) { return l.n >= a && l.n <= b && l.key === k; });
+    rows.push({ k: k, name: String(sd.names[k] || k).toLocaleUpperCase("vi"), c: c, leads: ls.length, book: ls.filter(function (l) { return l.st === "book"; }).length + c.cnt });
+    used[k] = 1;
+  });
+  rows.sort(function (x, y) { return y.c.rev - x.c.rev; });
+  var all = svcCalc(sd, "all", a, b), unk = svcCalc(sd, "CHUA RO", a, b);
+  var idle = [];
+  (m.svc || []).forEach(function (r) {
+    var nm = U(r[1]), k = sNorm(r[1]);
+    if (!nm || nm === "TỔNG CỘNG" || nm === "KHÁC" || used[k]) return;
+    idle.push(T(r[1]));
+  });
+  var cards = rows.map(function (r) {
+    var c = r.c, roas = c.roas, gc = "", gt = "";
+    if (roas != null) { if (roas >= 2) { gc = "good"; gt = "Hiệu quả cao"; } else if (roas >= 1) { gc = "warn"; gt = "Cần cải thiện"; } else { gc = "bad"; gt = "Đang lỗ ads"; } }
+    return '<div class="svc"><div class="svc-h"><b>' + esc(r.name) + '</b>' + (gt ? '<span class="pill ' + gc + '">' + gt + '</span>' : '') + '</div>' +
+      '<div class="svc-k"><div><div class="k">Doanh thu</div><div class="v">' + vnd(c.rev) + '</div></div>' +
+      '<div><div class="k">Chi ads</div><div class="v">' + vnd(c.sp.spend) + '</div></div>' +
+      '<div><div class="k">ROAS</div><div class="v">' + (roas != null ? n(roas, 2) + "x" : "-") + '</div></div></div>' +
+      '<div class="svc-sub"><span>Mess <b>' + n(Math.round(c.sp.mess)) + '</b></span><span>Data <b>' + n(r.leads) + '</b></span><span>Hẹn <b>' + n(r.book) + '</b></span><span>Đến <b>' + n(c.cnt) + '</b></span><span>Ads/DT <b class="' + (c.adsPct != null && c.adsPct > 1 ? "bad" : "") + '">' + (c.adsPct != null ? pct(c.adsPct) : "-") + '</b></span></div></div>';
+  }).join("");
+  var notes = [];
+  if (unk.rev > 0) notes.push('Khác (hóa đơn chưa rõ dịch vụ): <b>' + vnd(unk.rev) + '</b>, ' + n(unk.cnt) + ' hóa đơn');
+  if (unk.sp.spend > 0) notes.push('Chi ads chưa điền dịch vụ: <b>' + vnd(unk.sp.spend) + '</b>');
+  if (idle.length) notes.push('Chưa phát sinh ads: ' + idle.map(function (x) { return esc(sentence(x)); }).join(", "));
+  var sr = num(m.fin && m.fin[1]), sa = num(m.fin && m.fin[2]);
+  if (sr != null && Math.abs(sr - all.rev) > 1000) notes.push('Lưu ý: doanh thu cộng từ hóa đơn là ' + vnd(all.rev) + ', khác số trên sheet (' + vnd(sr) + ').');
+  if (sa != null && Math.abs(sa - all.sp.spend) > 1000) notes.push('Lưu ý: chi ads cộng từ dữ liệu gốc là ' + vnd(all.sp.spend) + ', khác số trên sheet (' + vnd(sa) + ').');
+  if (!cards && !notes.length) return "";
+  return '<section class="card"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards + (notes.length ? '<div class="small">' + notes.join("<br>") + '</div>' : '') + '</section>';
 }
 
 function setStatus(kind, text) {
@@ -181,7 +225,7 @@ function presets() {
   ];
 }
 
-var curRange = null, lastGood = null, busy = false;
+var curRange = null, lastGood = null, busy = false, lastSd = null;
 /* ---- Kết nối Google Sheets (chạy trong trình duyệt) ---- */
 var CFG = window.DORIAS_CONFIG || {};
 var SHEETS = "https://sheets.googleapis.com/v4/spreadsheets/" + CFG.SHEET_ID;
@@ -198,7 +242,7 @@ function authOk() { return !!anyToken(); }
 function saveTok() { try { sessionStorage.setItem("dorias_tok", JSON.stringify({ t: auth.token, exp: auth.exp })); } catch (e) {} }
 function clearTok() { auth.token = ""; auth.exp = 0; auth.wtoken = ""; auth.wexp = 0; try { sessionStorage.removeItem("dorias_tok"); localStorage.removeItem("dorias_tok"); } catch (e) {} }
 function wipeData() {
-  lastGood = lastDay = monthData = apptData = teleData = svcData = todayData = acctData = acctState = null;
+  lastSd = lastGood = lastDay = monthData = apptData = teleData = svcData = todayData = acctData = acctState = null;
   svcMemo.p = null;
   ["app", "appDay", "appMonth", "appAppt", "appTele", "appSvc", "appToday", "appAcct"].forEach(function (id) { var el = $(id); if (el) el.innerHTML = ""; });
   var bn = $("banner"); if (bn) { bn.hidden = true; bn.innerHTML = ""; }
@@ -434,7 +478,7 @@ function signOut() {
   showLogin("Đã đăng xuất.");
 }
 
-function show(res) {
+function show(res, sd) {
   var m = parse(res.rows);
   if (!m.fin || !m.funnel) {
     showBanner("Không tìm thấy các khối số liệu trong tab TONG_QUAN. Nếu bạn vừa đổi bố cục sheet, hãy cập nhật lại app.");
@@ -442,13 +486,14 @@ function show(res) {
   }
   lastGood = { m: m, ts: res.ts };
   curRange = { from: m.from, to: m.to };
-  hideBanner(); render(m); updatePeriodText();
+  if (sd) lastSd = sd;
+  hideBanner(); render(m, null, lastSd); updatePeriodText();
   if (view === "tong") setStatus("live", "Đồng bộ với Google Sheets lúc " + hhmm(res.ts) + ". Tự làm mới mỗi phút.");
 }
 function loadTong() {
   if (busy) return;
   busy = true;
-  run("getData").then(function (res) { show(res); })
+  Promise.all([run("getData"), run("getService", []).catch(function () { return null; })]).then(function (rs) { show(rs[0], rs[1]); })
     .catch(function (err) {
       showBanner("Không tải được số liệu. " + errText(err));
       if (lastGood) setStatus("stale", "Mất kết nối tạm thời. Đang giữ số liệu lúc " + hhmm(lastGood.ts) + ".");
@@ -1320,7 +1365,7 @@ function svcLeadRows(vals) {
   });
   return out;
 }
-function svcInvoiceRows(vals, leadIdx) {
+function svcInvoiceRows(vals, leadIdx, nameIdx) {
   var out = [], prev = null, noAmt = [];
   vals.forEach(function (r) {
     if (!/^\d+$/.test(T(r[0]))) return;
@@ -1337,11 +1382,17 @@ function svcInvoiceRows(vals, leadIdx) {
       for (var i = 0; i < cands.length; i++) if (cands[i].n <= dn) lead = cands[i];
       if (!lead) lead = cands[0];
     }
+    /* Không có số điện thoại hợp lệ (ví dụ "mã QR"): thử nối lead theo đúng tên khách, lấy lead gần nhất trước ngày hóa đơn. Bỏ qua dòng "bạn đi cùng". */
+    var nk = sNorm(x.name).replace(/\s+/g, " ");
+    if (!lead && nameIdx && nk.length >= 6 && nk.indexOf(" ") > 0 && !/\(|\bBAN\b|\bCHONG\b|\bVO\b|\bCON\b/.test(nk)) {
+      var nc = nameIdx[nk];
+      if (nc) for (var j = 0; j < nc.length; j++) if (nc[j].n <= dn && dn - nc[j].n <= 120 && nc[j].key !== "CHUA RO") lead = nc[j];
+    }
     x.lead = lead;
     var sameGroup = prev && prev.stt === x.stt && prev.n === x.n;
+    /* Cột dịch vụ trống mà không suy ra được từ lead thì xếp vào KHÁC (CHUA RO). Không còn mượn dịch vụ của dòng ngay phía trên. */
     if (x.key) x.keySrc = "sheet";
     else if (lead && lead.key !== "CHUA RO") { x.key = lead.key; x.keySrc = "lead"; }
-    else if (sameGroup && prev.key) { x.key = prev.key; x.keySrc = "dòng trên"; }
     else x.key = "CHUA RO";
     if (x.mk) x.mkSrc = "sheet";
     else if (lead && lead.country) { x.mk = lead.country === "Việt Nam" ? "vn" : (lead.country === "Khác" ? "" : "vk"); if (x.mk) x.mkSrc = "lead"; }
@@ -1366,10 +1417,15 @@ API.getService = function () {
 };
 API.getServiceRaw = function () {
   return Promise.all([getVals(SPEND_RANGE), getVals("'HÓA ĐƠN'!A1:P3000"), getVals("DATA_SALE!A2:N6000")]).then(function (res) {
-    var spend = svcSpendRows(res[0]), leads = svcLeadRows(res[2]), idx = {};
-    leads.forEach(function (l) { if (l.pk) (idx[l.pk] = idx[l.pk] || []).push(l); });
+    var spend = svcSpendRows(res[0]), leads = svcLeadRows(res[2]), idx = {}, nidx = {};
+    leads.forEach(function (l) {
+      if (l.pk) (idx[l.pk] = idx[l.pk] || []).push(l);
+      var nk = sNorm(l.name).replace(/\s+/g, " ");
+      if (nk) (nidx[nk] = nidx[nk] || []).push(l);
+    });
     Object.keys(idx).forEach(function (k) { idx[k].sort(function (a, b) { return a.n - b.n; }); });
-    var inv = svcInvoiceRows(res[1], idx);
+    Object.keys(nidx).forEach(function (k) { nidx[k].sort(function (a, b) { return a.n - b.n; }); });
+    var inv = svcInvoiceRows(res[1], idx, nidx);
     var names = {}, tot = {};
     function reg(key, name, v) { if (!names[key]) names[key] = name || key; tot[key] = (tot[key] || 0) + v; }
     spend.forEach(function (x) { reg(x.key, x.name, x.spend); });
@@ -1381,7 +1437,7 @@ API.getServiceRaw = function () {
 };
 function svcName(d, key) {
   if (key === "all") return "Tất cả dịch vụ";
-  if (key === "CHUA RO") return "Chưa rõ dịch vụ";
+  if (key === "CHUA RO") return "Khác (chưa rõ dịch vụ)";
   return sentence(d.names[key] || key);
 }
 function monthLen(y, m) { return new Date(Date.UTC(y, m, 0)).getUTCDate(); }
@@ -1630,9 +1686,9 @@ function renderSvc() {
     '<div class="presets" id="svcMk"></div><div id="svcList"></div></section>');
 
   var warns = [], inR = function (x) { return x.n >= a && x.n <= b; };
-  var noSvc = inv.filter(function (x) { return x.key === "CHUA RO"; }).length, guess = inv.filter(function (x) { return x.keySrc === "lead" || x.keySrc === "dòng trên"; }).length;
-  if (key === "all" && noSvc) warns.push(n(noSvc) + " hóa đơn chưa có dịch vụ và không suy ra được, nên chỉ nằm trong mục Tất cả dịch vụ.");
-  if (guess) warns.push(n(guess) + " hóa đơn trong kỳ để trống cột dịch vụ, app suy ra từ lead cùng số điện thoại hoặc từ dòng ngay phía trên. Nên điền cột I (DỊCH VỤ) trong tab HÓA ĐƠN.");
+  var noSvc = inv.filter(function (x) { return x.key === "CHUA RO"; }).length, guess = inv.filter(function (x) { return x.keySrc === "lead"; }).length;
+  if (key === "all" && noSvc) warns.push(n(noSvc) + " hóa đơn chưa có dịch vụ và không suy ra được, nên xếp vào KHÁC (chỉ nằm trong mục Tất cả dịch vụ).");
+  if (guess) warns.push(n(guess) + " hóa đơn trong kỳ để trống cột dịch vụ, app suy ra từ lead cùng số điện thoại hoặc cùng tên khách. Nên điền cột I (DỊCH VỤ) trong tab HÓA ĐƠN.");
   var noMk = inv.filter(function (x) { return !x.mk; }).length;
   if (noMk) warns.push(n(noMk) + " hóa đơn trong kỳ chưa rõ thị trường (Việt kiều hay Việt Nam) vì cột M (thị trường) trống.");
   var noAmt = d.noAmt.filter(inR).length;
@@ -2127,7 +2183,7 @@ function renderToday() {
 
   var invT = d.inv.filter(function (x) { return x.n === t; });
   out.push('<section class="card"><div class="eyebrow">Hóa đơn hôm nay</div>' + (invT.length ? '<div class="rows">' + invT.map(function (x) {
-    return '<div class="row"><span class="k">' + esc(x.name || "Chưa có tên") + '<br><span class="small">' + esc(x.key === "CHUA RO" ? "Chưa rõ dịch vụ" : sentence(d.names[x.key] || x.key)) + '</span></span><span class="v">' + vnd(x.amt) + '</span></div>';
+    return '<div class="row"><span class="k">' + esc(x.name || "Chưa có tên") + '<br><span class="small">' + esc(x.key === "CHUA RO" ? "Khác (chưa rõ dịch vụ)" : sentence(d.names[x.key] || x.key)) + '</span></span><span class="v">' + vnd(x.amt) + '</span></div>';
   }).join("") + '</div>' : '<div class="small">Hôm nay chưa có hóa đơn nào.</div>') + '</section>');
   $("appToday").innerHTML = out.join("");
   fillShare();

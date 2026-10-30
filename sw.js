@@ -1,5 +1,5 @@
 // Lưu giao diện để mở nhanh. Số liệu từ Google Sheets không bao giờ được lưu lại.
-var V = "dorias-v15";
+var V = "dorias-v16";
 var SHELL = ["./", "index.html", "app.js", "config.js", "manifest.webmanifest", "icons/icon-192.png", "icons/icon-512.png"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(V).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));

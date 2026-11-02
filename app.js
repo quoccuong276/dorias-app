@@ -152,6 +152,8 @@ function render(m, meta, sd) {
   }
   }
 
+  out.push(ovExtra(m, sd));
+
   if (m.verdict) out.push('<section class="card ov-verdict"><div class="eyebrow">Nhận định từ sheet</div><p class="verdict">' + esc(m.verdict) + '</p></section>');
 
   $("app").innerHTML = out.join("");
@@ -196,6 +198,120 @@ function ovSvc(m, sd) {
   if (sa != null && Math.abs(sa - all.sp.spend) > 1000) notes.push('Lưu ý: chi ads cộng từ dữ liệu gốc là ' + vnd(all.sp.spend) + ', khác số trên sheet (' + vnd(sa) + ').');
   if (!cards && !notes.length) return "";
   return '<section class="card ov-svc"><div class="eyebrow">Chi tiết dịch vụ</div>' + cards + (notes.length ? '<div class="small">' + notes.join("<br>") + '</div>' : '') + '</section>';
+}
+
+/* ---- Tổng quan: so với kỳ trước, xu hướng doanh thu và ads, phễu theo đợt khách (tính từ dữ liệu gốc) ---- */
+function ovSpark(vals, cls) {
+  var W = 84, H = 26, k = vals.length;
+  if (k < 2) return "";
+  var mx = Math.max.apply(null, vals.concat([1e-9])), mn = Math.min.apply(null, vals.concat([0]));
+  var pts = vals.map(function (v, i) { return (2 + i * (W - 4) / (k - 1)).toFixed(1) + "," + (H - 3 - (v - mn) / ((mx - mn) || 1) * (H - 6)).toFixed(1); });
+  return '<svg class="spk ' + (cls || "") + '" viewBox="0 0 ' + W + " " + H + '" aria-hidden="true"><polygon class="ar" points="2,' + (H - 3) + " " + pts.join(" ") + " " + (W - 2) + "," + (H - 3) + '"/><polyline class="ln" points="' + pts.join(" ") + '"/></svg>';
+}
+function ovBuckets(a, b, maxN) {
+  var len = b - a + 1, bs = Math.max(1, Math.ceil(len / maxN)), out = [];
+  for (var lo = a; lo <= b; lo += bs) out.push([lo, Math.min(lo + bs - 1, b)]);
+  return out;
+}
+function ovSeries(sd, bks) {
+  return bks.map(function (r) {
+    var sp = spendIn(sd, "all", r[0], r[1]), rev = 0, cnt = 0;
+    sd.inv.forEach(function (x) { if (x.n >= r[0] && x.n <= r[1]) { rev += x.amt; cnt++; } });
+    return { lo: r[0], hi: r[1], ads: sp.spend, mess: sp.mess, rev: rev, cnt: cnt };
+  });
+}
+function ovMom(sd, a, b) {
+  var len = b - a + 1, pa = a - len, pb = a - 1;
+  var c = svcCalc(sd, "all", a, b), p = svcCalc(sd, "all", pa, pb);
+  var ser = ovSeries(sd, ovBuckets(a, b, 30));
+  var hasPrev = p.rev > 0 || p.sp.spend > 0;
+  var defs = [
+    ["Doanh thu", c.rev, p.rev, vnd, 1, ser.map(function (x) { return x.rev; })],
+    ["Chi phí ads", c.sp.spend, p.sp.spend, vnd, 0, ser.map(function (x) { return x.ads; })],
+    ["ROAS", c.roas, p.roas, function (x) { return n(x, 2) + "x"; }, 1, ser.map(function (x) { return x.ads > 0 ? x.rev / x.ads : 0; })],
+    ["Ads / doanh thu", c.adsPct, p.adsPct, pct, -1, ser.map(function (x) { return x.rev > 0 ? x.ads / x.rev : 0; }), 1],
+    ["Mess", c.sp.mess, p.sp.mess, function (x) { return n(Math.round(x)); }, 1, ser.map(function (x) { return x.mess; })],
+    ["Hóa đơn", c.cnt, p.cnt, n, 1, ser.map(function (x) { return x.cnt; })],
+    ["CP / hóa đơn", c.cpa, p.cpa, vnd, -1, ser.map(function (x) { return x.cnt > 0 ? x.ads / x.cnt : 0; })]
+  ];
+  var rows = defs.map(function (d) {
+    var cur = d[1], prv = d[2], dl = "", col = "var(--muted)";
+    if (hasPrev && cur != null && prv != null && prv > 0) {
+      var ch = (cur - prv) / prv;
+      if (d[6]) dl = (cur - prv >= 0 ? "+" : "−") + n(Math.abs(cur - prv) * 100, 1) + " điểm";
+      else dl = pctS(ch);
+      if (Math.abs(ch) >= 0.005 && d[4] !== 0) col = ch * d[4] > 0 ? "var(--good)" : "var(--bad)";
+    }
+    return '<div class="mom-r"><span class="k">' + d[0] + '</span><span class="v">' + dash(cur, d[3]) + ' <span class="delta" style="color:' + col + '">' + dl + '</span></span>' + ovSpark(d[5]) + '</div>';
+  }).join("");
+  return '<section class="card ov-mom"><div class="eyebrow">So với kỳ trước</div>' + rows +
+    '<div class="small">' + (hasPrev ? 'Kỳ trước: ' + iso2dmy(dnIso(pa)) + ' – ' + iso2dmy(dnIso(pb)) + ' (cùng ' + len + ' ngày). ' : 'Chưa có dữ liệu ở kỳ trước để so sánh. ') +
+    'Màu xanh là tốt lên, màu đỏ là xấu đi; chi phí ads không tô màu. Biểu đồ nhỏ là diễn biến trong kỳ đang chọn.</div></section>';
+}
+function ovTrend(sd, a, b) {
+  var len = b - a + 1, bks;
+  if (len <= 14) bks = ovBuckets(a, b, 14);
+  else if (len <= 84) { bks = []; for (var lo = a; lo <= b; lo += 7) bks.push([lo, Math.min(lo + 6, b)]); }
+  else {
+    bks = []; var dt = new Date(a * 86400000), y = dt.getUTCFullYear(), m = dt.getUTCMonth() + 1;
+    while (true) { var s0 = dnum(y, m, 1), e0 = s0 + monthLen(y, m) - 1; if (s0 > b) break; bks.push([Math.max(a, s0), Math.min(b, e0)]); m++; if (m > 12) { m = 1; y++; } }
+  }
+  var ser = ovSeries(sd, bks), N = ser.length, unit = len <= 14 ? "ngày" : len <= 84 ? "tuần" : "tháng";
+  if (N < 2) return "";
+  var W = 320, H = 150, L = 4, T = 22, B = 22, ph = H - T - B, gw = (W - 2 * L) / N, bw = Math.min(gw * 0.36, 16);
+  var mx = Math.max.apply(null, ser.map(function (x) { return Math.max(x.rev, x.ads); }).concat([1]));
+  var g = '<line class="bl" x1="' + L + '" x2="' + (W - L) + '" y1="' + (T + ph) + '" y2="' + (T + ph) + '"/>', tr = 0, ta = 0, worst = null;
+  ser.forEach(function (x, i) {
+    tr += x.rev; ta += x.ads;
+    var cx = L + gw * i + gw / 2, hr = x.rev / mx * ph, ha = x.ads / mx * ph, pc = x.rev > 0 ? x.ads / x.rev : null;
+    var lb = len <= 14 ? String(+dnIso(x.lo).slice(8)) : len <= 84 ? iso2dmy(dnIso(x.lo)).slice(0, 5) : "T" + (+dnIso(x.lo).slice(5, 7));
+    var tip = lb + ": doanh thu " + vnd(x.rev) + ", chi ads " + vnd(x.ads) + (pc != null ? ", ads/DT " + pct(pc) : "");
+    if (pc != null && x.rev > 0 && (!worst || pc > worst.pc)) worst = { pc: pc, lb: lb };
+    g += '<g><title>' + esc(tip) + '</title><rect class="rv" x="' + (cx - bw - 0.5).toFixed(1) + '" y="' + (T + ph - hr).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + hr.toFixed(1) + '" rx="2"/>' +
+      '<rect class="ad" x="' + (cx + 0.5).toFixed(1) + '" y="' + (T + ph - ha).toFixed(1) + '" width="' + bw.toFixed(1) + '" height="' + ha.toFixed(1) + '" rx="2"/>';
+    if (N <= 12 && pc != null) g += '<text class="pc ' + (pc <= 0.3 ? "g" : pc <= 0.4 ? "w" : "b") + '" x="' + cx.toFixed(1) + '" y="' + (T + ph - Math.max(hr, ha) - 4).toFixed(1) + '" text-anchor="middle">' + Math.round(pc * 100) + '%</text>';
+    if (N <= 14 || i % 2 === 0) g += '<text x="' + cx.toFixed(1) + '" y="' + (H - 7) + '" text-anchor="middle">' + esc(lb) + '</text>';
+    g += '</g>';
+  });
+  var note = ta > 0 && tr > 0 ? "Cả kỳ: chi ads bằng " + pct(ta / tr) + " doanh thu." + (worst && N > 1 ? " " + (unit === "ngày" ? "Ngày " : unit === "tuần" ? "Tuần " : "") + worst.lb + (unit === "tháng" ? "" : "") + " cao nhất, " + pct(worst.pc) + "." : "") : "";
+  return '<section class="card ov-trend"><div class="eyebrow">Doanh thu và chi phí ads theo ' + unit + '</div>' +
+    '<div class="vz ovt"><svg viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Doanh thu và chi phí ads theo ' + unit + '">' + g + '</svg></div>' +
+    '<div class="legend2"><span><i style="background:var(--navy)"></i>Doanh thu</span><span><i style="background:var(--ads)"></i>Chi phí ads</span><span>Số % là ads / doanh thu</span></div>' +
+    (note ? '<div class="small">' + note + ' Mức tốt là từ 30% trở xuống, chú ý khi trên 40%.</div>' : '') + '</section>';
+}
+function ovCohort(sd, a, b) {
+  var c = svcCalc(sd, "all", a, b), mess = c.sp.mess, data = c.leads, book = c.leadBook, inv = c.leadInv;
+  if (!(data > 0)) return "";
+  var cinv = sd.inv.filter(function (x) { return x.lead && x.lead.n >= a && x.lead.n <= b; }), crev = 0, lags = [];
+  cinv.forEach(function (x) { crev += x.amt; if (x.lag != null) lags.push(x.lag); });
+  var med = medianOf(lags), t = new Date(), today = dnum(t.getFullYear(), t.getMonth() + 1, t.getDate()), age = today - b;
+  function ratio(x, y) { return y > 0 ? pct(x / y) : "-"; }
+  var st = [
+    { name: "Mess", v: mess, note: "Tin nhắn trong kỳ" },
+    { name: "Data", v: data, note: ratio(data, mess) + " so với mess" },
+    { name: "Lịch hẹn", v: book, note: ratio(book, data) + " so với data" },
+    { name: "Hóa đơn", v: inv, note: ratio(inv, book) + " so với lịch hẹn, " + ratio(inv, data) + " so với data", ok: true }
+  ];
+  var top = Math.max(mess, data, 1);
+  var bars = st.map(function (s) {
+    return '<div class="stage"><div class="top"><span class="name">' + s.name + '</span><span class="num">' + n(Math.round(s.v)) + '</span></div><div class="track"><i class="' + (s.ok ? "ok" : "") + '" style="width:' + Math.max(s.v / top * 100, 1.5).toFixed(2) + '%"></i></div><div class="note">' + s.note + '</div></div>';
+  }).join("");
+  var rows = [["CP / data", c.sp.spend > 0 ? vnd(c.sp.spend / data) : "-"], ["CP / hóa đơn của đợt", inv > 0 && c.sp.spend > 0 ? vnd(c.sp.spend / inv) : "-"],
+    ["Doanh thu của đợt này", vnd(crev) + ' <span class="small">(' + n(cinv.length) + ' hóa đơn)</span>'], ["ROAS của đợt", c.sp.spend > 0 ? n(crev / c.sp.spend, 2) + "x" : "-"]];
+  var notes = ["Tính theo ngày khách vào data: những khách có data trong kỳ này, sau đó đã hẹn và chốt bao nhiêu, kể cả khi hóa đơn nằm ngoài kỳ. Khác với phễu ở trên, tính khách đến trong kỳ."];
+  if (med != null) notes.push("Từ lúc có data đến lúc có hóa đơn, trung vị khoảng " + n(Math.round(med)) + " ngày.");
+  if (med != null && age < med * 1.5) notes.push("Đợt này kết thúc cách đây " + n(Math.max(age, 0)) + " ngày nên hóa đơn và doanh thu của đợt còn có thể tăng thêm.");
+  return '<section class="card ov-cohort"><div class="eyebrow">Phễu theo đợt khách</div><div class="funnel">' + bars + '</div><div class="rows">' +
+    rows.map(function (r) { return '<div class="row"><span class="k">' + r[0] + '</span><span class="v">' + r[1] + '</span></div>'; }).join("") + '</div><div class="small">' + notes.join(" ") + '</div></section>';
+}
+function ovExtra(m, sd) {
+  var pf = ymdOf(m.from), pt = ymdOf(m.to);
+  if (!sd || !sd.names || !pf || !pt || !pf.y || !pt.y) return "";
+  var a = dnum(pf.y, pf.m, pf.d), b = dnum(pt.y, pt.m, pt.d);
+  if (b < a) return "";
+  var h = "";
+  [ovMom, ovTrend, ovCohort].forEach(function (f) { try { h += f(sd, a, b); } catch (e) { if (window.console) console.error(e); } });
+  return h;
 }
 
 function setStatus(kind, text) {

@@ -303,13 +303,13 @@ details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-off
   #range, #dayPanel, #apptPanel, #telePanel, #svcPanel { max-width: 760px; }
 
   /* Các tab khác: cột xếp gạch */
-  #appDay, #appMonth, #appAppt, #appTele, #appSvc, #appToday, #appAcct {
+  #appDay, #appMonth, #appAppt, #appTele, #appSvc, #appToday, #appAcct, #appAds {
     display: block; column-count: 2; column-gap: 18px;
   }
-  #appDay > *, #appMonth > *, #appAppt > *, #appTele > *, #appSvc > *, #appToday > *, #appAcct > * {
+  #appDay > *, #appMonth > *, #appAppt > *, #appTele > *, #appSvc > *, #appToday > *, #appAcct > *, #appAds > * {
     break-inside: avoid; margin: 0 0 18px; min-width: 0;
   }
-  #appDay > .hero, #appMonth > .hero, #appAppt > .hero, #appTele > .hero, #appSvc > .hero, #appToday > .hero, #appAcct > .hero,
+  #appDay > .hero, #appMonth > .hero, #appAppt > .hero, #appTele > .hero, #appSvc > .hero, #appToday > .hero, #appAcct > .hero, #appAds > .hero,
   #appSvc > .foot { column-span: all; }
   section.card { overflow-x: auto; padding: 20px; }
 
@@ -382,6 +382,7 @@ details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-off
       <button class="tab" id="tabTong" role="tab" aria-selected="true" type="button">Tổng quan</button>
       <button class="tab" id="tabToday" role="tab" aria-selected="false" type="button">Hôm nay</button>
       <button class="tab" id="tabAcct" role="tab" aria-selected="false" type="button">Tài khoản</button>
+      <button class="tab" id="tabAds" role="tab" aria-selected="false" type="button">Quảng cáo</button>
       <button class="tab" id="tabNgay" role="tab" aria-selected="false" type="button">Theo ngày</button>
       <button class="tab" id="tabThang" role="tab" aria-selected="false" type="button">Theo tháng</button>
       <button class="tab" id="tabLich" role="tab" aria-selected="false" type="button">Lịch hẹn</button>
@@ -450,6 +451,7 @@ details.mrow summary:focus-visible { outline: 2px solid var(--navy); outline-off
   <div id="appSvc" hidden></div>
   <div id="appToday" hidden></div>
   <div id="appAcct" hidden></div>
+  <div id="appAds" hidden></div>
   <div class="foot" id="foot"></div>
   <div class="foot"><button type="button" class="linkbtn" id="signout" hidden>Đăng xuất</button></div>
 </div>

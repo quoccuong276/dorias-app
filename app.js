@@ -358,9 +358,9 @@ function authOk() { return !!anyToken(); }
 function saveTok() { try { sessionStorage.setItem("dorias_tok", JSON.stringify({ t: auth.token, exp: auth.exp })); } catch (e) {} }
 function clearTok() { auth.token = ""; auth.exp = 0; auth.wtoken = ""; auth.wexp = 0; try { sessionStorage.removeItem("dorias_tok"); localStorage.removeItem("dorias_tok"); } catch (e) {} }
 function wipeData() {
-  lastSd = lastGood = lastDay = monthData = apptData = teleData = svcData = todayData = acctData = acctState = adsData = null;
+  lastSd = lastGood = lastDay = monthData = apptData = teleData = svcData = todayData = acctData = acctState = null;
   svcMemo.p = null;
-  ["app", "appDay", "appMonth", "appAppt", "appTele", "appSvc", "appToday", "appAcct", "appAds"].forEach(function (id) { var el = $(id); if (el) el.innerHTML = ""; });
+  ["app", "appDay", "appMonth", "appAppt", "appTele", "appSvc", "appToday", "appAcct"].forEach(function (id) { var el = $(id); if (el) el.innerHTML = ""; });
   var bn = $("banner"); if (bn) { bn.hidden = true; bn.innerHTML = ""; }
 }
 
@@ -823,8 +823,8 @@ function initDay() {
 }
 
 /* ---- Điều hướng 4 trang ---- */
-var VIEWS = { tong: ["tabTong", "app"], ngay: ["tabNgay", "appDay"], thang: ["tabThang", "appMonth"], lich: ["tabLich", "appAppt"], tele: ["tabTele", "appTele"], svc: ["tabSvc", "appSvc"], today: ["tabToday", "appToday"], acct: ["tabAcct", "appAcct"], ads: ["tabAds", "appAds"] };
-function viewData(v) { return { tong: lastGood, ngay: lastDay, thang: monthData, lich: apptData, tele: teleData, svc: svcData, today: todayData, acct: acctData, ads: adsData }[v]; }
+var VIEWS = { tong: ["tabTong", "app"], ngay: ["tabNgay", "appDay"], thang: ["tabThang", "appMonth"], lich: ["tabLich", "appAppt"], tele: ["tabTele", "appTele"], svc: ["tabSvc", "appSvc"], today: ["tabToday", "appToday"], acct: ["tabAcct", "appAcct"] };
+function viewData(v) { return { tong: lastGood, ngay: lastDay, thang: monthData, lich: apptData, tele: teleData, svc: svcData, today: todayData, acct: acctData }[v]; }
 function setView(v) {
   view = v;
   try { $(VIEWS[v][0]).scrollIntoView({ inline: "nearest", block: "nearest" }); } catch (e) {}
@@ -834,16 +834,14 @@ function setView(v) {
   });
   $("range").hidden = true; $("dayPanel").hidden = true; $("apptPanel").hidden = true; $("telePanel").hidden = true; $("svcPanel").hidden = true;
   $("period").setAttribute("aria-expanded", "false");
-  $("period").disabled = v === "thang" || v === "today" || v === "acct" || v === "ads";
+  $("period").disabled = v === "thang" || v === "today" || v === "acct";
   hideBanner(); updatePeriodText();
   if (!viewData(v)) {
-    var names = { ngay: "theo ngày", thang: "theo tháng", lich: "lịch hẹn", tele: "tele", svc: "dịch vụ", today: "hôm nay", acct: "tài khoản quảng cáo", ads: "quảng cáo", tong: "tổng quan" };
+    var names = { ngay: "theo ngày", thang: "theo tháng", lich: "lịch hẹn", tele: "tele", svc: "dịch vụ", today: "hôm nay", acct: "tài khoản quảng cáo", tong: "tổng quan" };
     if (v !== "tong") $(VIEWS[v][1]).innerHTML = '<section class="card"><div class="small">Đang tải số liệu ' + names[v] + '…</div></section>';
     setStatus("stale", "Đang tải số liệu…");
   } else if (v === "today") {
     setStatus("live", "Đồng bộ với Google Sheets lúc " + hhmm(todayData.ts) + ". Tự làm mới mỗi phút.");
-  } else if (v === "ads") {
-    setStatus("live", adsData.hb ? "Số liệu Meta cập nhật lúc " + hhmm(adsData.hb) + ", tự cập nhật mỗi 15 phút." : "Đồng bộ với Google Sheets lúc " + hhmm(adsData.ts) + ".");
   } else if (v === "acct") {
     setStatus("live", "Đồng bộ với Google Sheets lúc " + hhmm(acctData.ts) + ". Tự làm mới mỗi phút.");
   } else if (v === "svc") {
@@ -868,7 +866,6 @@ function load() {
   else if (view === "svc") loadSvc();
   else if (view === "today") loadToday();
   else if (view === "acct") loadAcct();
-  else if (view === "ads") loadAds();
   else loadTong();
 }
 function updatePeriodText() {
@@ -877,7 +874,7 @@ function updatePeriodText() {
   else if (view === "ngay" && lastDay) t = lastDay.m.date;
   else if (view === "thang") t = monthData && monthData.rangeText ? monthData.rangeText : "Theo tháng";
   else if (view === "lich" && curAppt) t = iso2dmy(curAppt.from).slice(0, 5) + " – " + iso2dmy(curAppt.to);
-  else if (view === "today" || view === "acct" || view === "ads") t = dnDmy(todayNum());
+  else if (view === "today" || view === "acct") t = dnDmy(todayNum());
   else if (view === "svc" && curSvc) t = iso2dmy(curSvc.from).slice(0, 5) + " – " + iso2dmy(curSvc.to);
   else if (view === "tele" && curTele) t = iso2dmy(curTele.from).slice(0, 5) + " – " + iso2dmy(curTele.to);
   if (t) $("period").textContent = t;
@@ -2477,143 +2474,6 @@ function initAcct() {
   });
 }
 
-/* ---- Trang "Quảng cáo": xếp hạng từng bài theo chi phí mỗi tin nhắn (đọc tab QUANG_CAO do Apps Script QuangCao.gs ghi, app không ghi) ---- */
-var adsData = null, busyAd = false, adPer = "HOM_NAY", adAcc = "all", adRun = true, adGrp = "ad";
-var AD_TH = { HOM_NAY: 100000, "3_NGAY": 250000, "7_NGAY": 400000 };
-var AD_PERS = [["HOM_NAY", "Hôm nay"], ["3_NGAY", "3 ngày"], ["7_NGAY", "7 ngày"]];
-var AD_STALE = 45 * 60000;
-API.getAds = function () {
-  return getVals("QUANG_CAO!A1:Q3000").then(function (v) {
-    var rows = [], hb = null, err = "";
-    v.forEach(function (r, i) {
-      if (i === 1) { hb = parseTs(r[15]); err = T(r[16]); }
-      if (i === 0) return;
-      var per = T(r[0]);
-      if (!AD_TH[per] || !T(r[5])) return;
-      rows.push({ per: per, acct: T(r[1]), acctId: T(r[2]), camp: T(r[3]), adset: T(r[4]), id: T(r[5]), name: T(r[6]) || T(r[5]), st: T(r[7]),
-        spend: sNum(r[8]), imp: sNum(r[9]), reach: sNum(r[10]), clicks: sNum(r[11]), mess: sNum(r[12]), post: T(r[13]) });
-    });
-    return { rows: rows, hb: hb, err: err, ok: true, ts: Date.now() };
-  }).catch(function (e) {
-    if (e && (e.status === 400 || e.status === 404)) return { rows: [], hb: null, err: "", ok: false, ts: Date.now() };
-    throw e;
-  });
-};
-/* Gom các dòng theo quảng cáo (hoặc theo bài viết, để thấy bài đã được nhân bản sang bao nhiêu tài khoản), tính sẵn cả 3 kỳ */
-function adItems(d) {
-  var map = {}, order = [];
-  d.rows.forEach(function (r) {
-    if (adAcc !== "all" && r.acct !== adAcc) return;
-    var key = adGrp === "post" && r.post ? "p:" + r.post : "a:" + r.id;
-    var it = map[key];
-    if (!it) { it = map[key] = { key: key, name: r.name, post: r.post, accts: {}, ads: {}, run: false, per: {} }; order.push(key); }
-    it.accts[r.acct] = 1;
-    if (!it.ads[r.id]) it.ads[r.id] = r;
-    if (r.st === "ACTIVE" || !r.st) it.run = true;
-    var p = it.per[r.per] || (it.per[r.per] = { spend: 0, mess: 0, imp: 0, reach: 0, clicks: 0 });
-    p.spend += r.spend; p.mess += r.mess; p.imp += r.imp; p.reach += r.reach; p.clicks += r.clicks;
-  });
-  return order.map(function (k) { return map[k]; });
-}
-function adMon(x) { return Math.abs(x) >= 1e6 ? mon(x) : n(Math.round(x / 1000)) + "k"; }
-function adCpm(p) { return p && p.mess > 0 ? p.spend / p.mess : null; }
-function adIdOk(x) { return /^\d+$/.test(x); }
-function renderAds() {
-  var d = adsData, box = $("appAds"), out = [];
-  if (!d) return;
-  if (!d.ok) {
-    box.innerHTML = '<section class="card check"><div class="eyebrow">Chưa có dữ liệu quảng cáo</div><p class="verdict">Chưa tìm thấy tab QUANG_CAO trong sheet. Dán file QuangCao.gs vào Apps Script, thêm META_TOKEN trong Script properties, rồi chạy hàm batTuDongQuangCao một lần. Hướng dẫn nằm ở đầu file.</p></section>';
-    return;
-  }
-  var th = AD_TH[adPer], accts = {};
-  d.rows.forEach(function (r) { accts[r.acct] = 1; });
-  var items = adItems(d).filter(function (it) { return it.per[adPer] && it.per[adPer].spend > 0 && (!adRun || it.run); });
-  var elig = [], rest = [];
-  items.forEach(function (it) {
-    var p = it.per[adPer], c = adCpm(p);
-    it.cpm = c;
-    (p.spend >= th && p.mess >= 3 ? elig : rest).push(it);
-  });
-  var med = medianOf(elig.map(function (x) { return x.cpm; }));
-  elig.sort(function (a, b) { return a.cpm - b.cpm || b.per[adPer].mess - a.per[adPer].mess; });
-  rest.sort(function (a, b) { return b.per[adPer].spend - a.per[adPer].spend; });
-  var tSp = 0, tMs = 0, nGood = 0;
-  items.forEach(function (it) { tSp += it.per[adPer].spend; tMs += it.per[adPer].mess; });
-  elig.forEach(function (it) {
-    var p = it.per[adPer];
-    it.tag = "";
-    if (med != null) {
-      if (it.cpm <= med * 0.8 && p.mess >= 5) { it.tag = "good"; nGood++; }
-      else if (p.spend >= th * 2 && it.cpm >= med * 1.5) it.tag = "bad";
-    }
-  });
-  rest.forEach(function (it) { it.tag = ""; if (it.per[adPer].spend >= th * 2 && it.per[adPer].mess === 0) it.tag = "bad"; });
-
-  var perLab = AD_PERS.filter(function (x) { return x[0] === adPer; })[0][1];
-  out.push('<div class="hero"><div><div class="eyebrow">Chi phí mỗi tin nhắn trung bình · ' + perLab + '</div><div class="big">' + (tMs > 0 ? vnd(tSp / tMs) : "-") + '</div></div>' +
-    '<div class="hero-stats cols3"><div><div class="eyebrow">Chi tiêu</div><div class="v">' + mon(tSp) + '</div></div><div><div class="eyebrow">Tin nhắn</div><div class="v">' + n(Math.round(tMs)) + '</div></div><div><div class="eyebrow">Bài đang tốt</div><div class="v">' + n(nGood) + '</div></div></div></div>');
-
-  function chip(attr, val, label, on) { return '<button type="button" class="chip" ' + attr + '="' + esc(val) + '" aria-pressed="' + (on ? "true" : "false") + '">' + esc(label) + '</button>'; }
-  var accNames = Object.keys(accts).sort();
-  var sel = accNames.length > 1 ? '<select class="lsearch" id="adAccSel" aria-label="Lọc theo tài khoản"><option value="all">Tất cả tài khoản</option>' + accNames.map(function (a) { return '<option value="' + esc(a) + '"' + (a === adAcc ? " selected" : "") + '>' + esc(a) + '</option>'; }).join("") + '</select>' : "";
-  function card(it, rank) {
-    var p = it.per[adPer], first = it.ads[Object.keys(it.ads)[0]], nAc = Object.keys(it.accts).length, nAd = Object.keys(it.ads).length;
-    var tag = it.tag === "good" ? '<span class="pill good">Đang tốt</span>' : it.tag === "bad" ? '<span class="pill bad">Đang đuối</span>' : "";
-    var others = AD_PERS.map(function (x) { var c = adCpm(it.per[x[0]]); return x[1] + ' <b' + (x[0] === adPer ? ' style="color:var(--ink)"' : "") + '>' + (c != null ? mon(c) : "-") + '</b>'; }).join(" · ");
-    var where = adGrp === "post" ? "Chạy ở " + n(nAc) + " tài khoản, " + n(nAd) + " quảng cáo" : esc(first.acct) + (first.camp ? " · " + esc(first.camp) : "");
-    var ids = Object.keys(it.ads).filter(adIdOk), act = first.acctId.replace(/^act_/, "");
-    var link = ids.length && adIdOk(act) ? '<a class="chip" href="https://adsmanager.facebook.com/adsmanager/manage/ads?act=' + act + '&selected_ad_ids=' + ids[0] + '" target="_blank" rel="noopener noreferrer">Mở trong Ads Manager</a>' : "";
-    var copy = it.post && /^[\d_]+$/.test(it.post) ? '<button type="button" class="chip" data-adcp="' + esc(it.post) + '">Sao chép mã bài</button>' : "";
-    return '<div class="svc"><div class="svc-h"><b>' + (rank ? rank + ". " : "") + esc(it.name) + '</b>' + tag + '</div>' +
-      '<div class="svc-k c4"><div><div class="k">CP / tin nhắn</div><div class="v">' + (it.cpm != null ? vnd(it.cpm) : "-") + '</div></div>' +
-      '<div><div class="k">Tin nhắn</div><div class="v">' + n(Math.round(p.mess)) + '</div></div>' +
-      '<div><div class="k">Chi tiêu</div><div class="v">' + adMon(p.spend) + '</div></div>' +
-      '<div><div class="k">Tiếp cận</div><div class="v">' + n(Math.round(p.reach)) + '</div></div></div>' +
-      '<div class="svc-sub"><span>' + where + '</span></div><div class="svc-sub"><span>CP / tin nhắn: ' + others + '</span></div>' +
-      (copy || link ? '<div class="presets" style="margin-top:4px">' + copy + link + '</div>' : "") + '</div>';
-  }
-  var cards = elig.map(function (it, i) { return card(it, i + 1); }).join("");
-  var restH = rest.length ? '<details class="mrow"><summary><span class="mh"><b>Chưa đủ số liệu để xếp hạng</b></span><span class="mv">' + n(rest.length) + '</span></summary><div class="mbody">' + rest.slice(0, 40).map(function (it) { return card(it, 0); }).join("") + (rest.length > 40 ? '<div class="small">Chỉ hiện 40 bài chi nhiều nhất.</div>' : "") + '</div></details>' : "";
-  out.push('<section class="card"><div class="eyebrow">Bài quảng cáo ra tin nhắn tốt nhất</div><div class="presets">' +
-    AD_PERS.map(function (x) { return chip("data-adp", x[0], x[1], adPer === x[0]); }).join("") + '</div><div class="presets">' +
-    chip("data-adg", "ad", "Từng quảng cáo", adGrp === "ad") + chip("data-adg", "post", "Gộp theo bài viết", adGrp === "post") +
-    '<button type="button" class="chip" data-adr="1" aria-pressed="' + (adRun ? "true" : "false") + '">Chỉ bài đang chạy</button></div>' + sel +
-    (cards || '<div class="small">Chưa có bài nào đủ số liệu trong kỳ này.</div>') + restH +
-    '<div class="small">Xếp theo chi phí mỗi tin nhắn từ thấp đến cao, chỉ xếp bài đã chi từ ' + mon(th) + ' và có ít nhất 3 tin nhắn' + (med != null ? '. Mức trung vị hiện tại là ' + vnd(med) + '. Đang tốt là rẻ hơn trung vị từ 20% trở lên và có từ 5 tin nhắn; đang đuối là chi gấp đôi mức tối thiểu mà chi phí cao hơn trung vị 1,5 lần hoặc chưa có tin nhắn nào.' : '.') + ' Chọn "Gộp theo bài viết" để cộng số liệu của cùng một bài đã nhân bản ở nhiều tài khoản. Sao chép mã bài để dùng lại bài có sẵn khi tạo quảng cáo ở tài khoản khác.</div></section>');
-  var warns = [];
-  if (!d.hb || Date.now() - d.hb > AD_STALE) warns.push("Số liệu Meta" + (d.hb ? " lần cập nhật cuối lúc " + hhmm(d.hb) : "") + " đã cũ hơn 45 phút. Kiểm tra trigger của QuangCao.gs trong Apps Script.");
-  if (d.err) warns.push("Lần chạy gần nhất có lỗi: " + d.err);
-  if (warns.length) out.push('<section class="card check"><div class="eyebrow">Cần kiểm tra</div>' + warns.map(function (w) { return '<p class="verdict">' + esc(w) + '</p>'; }).join("") + '</section>');
-  box.innerHTML = out.join("");
-}
-function loadAds() {
-  if (busyAd) return;
-  busyAd = true;
-  run("getAds", []).then(function (res) {
-    adsData = res; renderAds();
-    if (view === "ads") { hideBanner(); updatePeriodText(); setStatus("live", res.hb ? "Số liệu Meta cập nhật lúc " + hhmm(res.hb) + ", tự cập nhật mỗi 15 phút." : "Đồng bộ với Google Sheets lúc " + hhmm(res.ts) + "."); }
-  }).catch(function (err) {
-    if (view !== "ads") return;
-    showBanner("Không tải được số liệu. " + errText(err));
-    setStatus("stale", adsData ? "Mất kết nối tạm thời. Đang giữ số liệu lúc " + hhmm(adsData.ts) + "." : "Chưa tải được số liệu.");
-  }).then(function () { busyAd = false; $("refresh").disabled = false; $("refresh").textContent = "Làm mới"; });
-}
-function initAds() {
-  $("tabAds").addEventListener("click", function () { setView("ads"); load(); });
-  $("appAds").addEventListener("click", function (e) {
-    var b = e.target.closest("button");
-    if (!b) return;
-    if (b.hasAttribute("data-adp")) { adPer = b.getAttribute("data-adp"); renderAds(); }
-    else if (b.hasAttribute("data-adg")) { adGrp = b.getAttribute("data-adg"); renderAds(); }
-    else if (b.hasAttribute("data-adr")) { adRun = !adRun; renderAds(); }
-    else if (b.hasAttribute("data-adcp")) {
-      var v = b.getAttribute("data-adcp"), done = function () { b.textContent = "Đã chép"; setTimeout(function () { b.textContent = "Sao chép mã bài"; }, 1800); };
-      try { navigator.clipboard.writeText(v).then(done, function () { window.prompt("Sao chép mã bài:", v); }); } catch (x) { window.prompt("Sao chép mã bài:", v); }
-    }
-  });
-  $("appAds").addEventListener("change", function (e) { if (e.target && e.target.id === "adAccSel") { adAcc = e.target.value; renderAds(); } });
-}
-
 $("app").innerHTML = '<section class="card"><div class="small">Đang tải số liệu từ Google Sheets…</div></section>';
 setStatus("stale", "Đang tải số liệu…");
 $("foot").textContent = "Nguồn: file BAO CAO TONG QUAN - DORIAS";
@@ -2624,7 +2484,6 @@ initTele();
 initSvc();
 initToday();
 initAcct();
-initAds();
 $("loginBtn").addEventListener("click", startLogin);
 $("signout").addEventListener("click", signOut);
 function tick() {
